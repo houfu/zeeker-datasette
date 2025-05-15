@@ -1,0 +1,36 @@
+{% extends "default:index.html" %}
+
+{% block extra_head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<div class="home-info">
+  <h1>Immutable Datasette</h1>
+  <p>This is a custom Datasette instance that loads SQLite databases from an S3 bucket and serves them in immutable mode.</p>
+  <p>The data is read-only and cannot be modified through this interface.</p>
+</div>
+
+<div class="metadata-description">
+  <h2>Available Databases</h2>
+  <p>The following databases are available for exploration:</p>
+</div>
+
+{{ super() }}
+
+<div class="metadata-description">
+  <h2>About this Instance</h2>
+  <p>This Datasette instance automatically downloads databases from the configured S3 bucket on startup.</p>
+  <p>All data is served in immutable mode, meaning it cannot be modified through the Datasette interface.</p>
+  <p>The instance is configured with custom templates and styling to enhance the user experience.</p>
+  
+  <h3>Features</h3>
+  <ul>
+    <li>Automatic database downloads from S3</li>
+    <li>Immutable data access</li>
+    <li>Custom styling and templates</li>
+    <li>Full-text search capabilities</li>
+    <li>API access to all data</li>
+  </ul>
+</div>
+{% endblock %}

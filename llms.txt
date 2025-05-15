@@ -1,0 +1,496 @@
+./Dockerfile
+---
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy project files
+COPY requirements.txt .
+COPY scripts/ ./scripts/
+COPY metadata.json .
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY plugins/ ./plugins/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create data directory for downloaded databases
+RUN mkdir -p /data
+
+# Environment variables
+ENV DATASETTE_DATABASE_DIR=/data
+ENV DATASETTE_TEMPLATE_DIR=/app/templates
+ENV DATASETTE_PLUGINS_DIR=/app/plugins
+ENV DATASETTE_STATIC_DIR=/app/static
+ENV DATASETTE_METADATA=/app/metadata.json
+
+# Port for Datasette to listen on
+EXPOSE 8001
+
+# Entry point script
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+---
+./docker-compose.yml
+---
+services:
+  zeeker-datasette:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zeeker-datasette
+    ports:
+      - "8001:8001"
+    environment:
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_PREFIX=${S3_PREFIX:-latest}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - AWS_REGION=${AWS_REGION:-default}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      # For development, you can mount these directories to make changes without rebuilding
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - ./plugins:/app/plugins
+      - ./metadata.json:/app/metadata.json
+    restart: unless-stopped
+    # Add health checks to docker-compose.yml
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8001/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+---
+./entrypoint.sh
+---
+#!/bin/bash
+set -e
+
+# Run the S3 download script if S3_BUCKET is provided
+if [ -n "$S3_BUCKET" ]; then
+    echo "Downloading databases from S3 bucket: $S3_BUCKET"
+    python /app/scripts/download_from_s3.py
+else
+    echo "No S3_BUCKET specified, skipping database download"
+fi
+
+# Check if any databases were downloaded
+if [ -z "$(ls -A /data)" ]; then
+    echo "Warning: No databases found in /data directory"
+fi
+
+# List downloaded databases
+echo "Available databases:"
+ls -la /data
+
+# Start Datasette with immutable flag
+echo "Starting Datasette in immutable mode"
+exec datasette serve --host 0.0.0.0 --port 8001 \
+    --metadata /app/metadata.json \
+    --template-dir /app/templates \
+    --plugins-dir /app/plugins \
+    --static /static:/app/static \
+    --immutable \
+    /data/*.db
+
+---
+./llms.txt
+---
+./Dockerfile
+---
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy project files
+COPY requirements.txt .
+COPY scripts/ ./scripts/
+COPY metadata.json .
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY plugins/ ./plugins/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Create data directory for downloaded databases
+RUN mkdir -p /data
+
+# Environment variables
+ENV DATASETTE_DATABASE_DIR=/data
+ENV DATASETTE_TEMPLATE_DIR=/app/templates
+ENV DATASETTE_PLUGINS_DIR=/app/plugins
+ENV DATASETTE_STATIC_DIR=/app/static
+ENV DATASETTE_METADATA=/app/metadata.json
+
+# Port for Datasette to listen on
+EXPOSE 8001
+
+# Entry point script
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+---
+./docker-compose.yml
+---
+services:
+  zeeker-datasette:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zeeker-datasette
+    ports:
+      - "8001:8001"
+    environment:
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_PREFIX=${S3_PREFIX:-latest}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - AWS_REGION=${AWS_REGION:-default}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      # For development, you can mount these directories to make changes without rebuilding
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - ./plugins:/app/plugins
+      - ./metadata.json:/app/metadata.json
+    restart: unless-stopped
+    # Add health checks to docker-compose.yml
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8001/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+---
+./entrypoint.sh
+---
+#!/bin/bash
+set -e
+
+# Run the S3 download script if S3_BUCKET is provided
+if [ -n "$S3_BUCKET" ]; then
+    echo "Downloading databases from S3 bucket: $S3_BUCKET"
+    python /app/scripts/download_from_s3.py
+else
+    echo "No S3_BUCKET specified, skipping database download"
+fi
+
+# Check if any databases were downloaded
+if [ -z "$(ls -A /data)" ]; then
+    echo "Warning: No databases found in /data directory"
+fi
+
+# List downloaded databases
+echo "Available databases:"
+ls -la /data
+
+# Start Datasette with immutable flag
+echo "Starting Datasette in immutable mode"
+exec datasette serve --host 0.0.0.0 --port 8001 \
+    --metadata /app/metadata.json \
+    --template-dir /app/templates \
+    --plugins-dir /app/plugins \
+    --static /static:/app/static \
+    --immutable \
+    /data/*.db
+
+---
+
+
+---
+./metadata.json
+---
+{
+  "title": "data.zeeker.sg",
+  "description": "Singapore's open legal data resource for data applications and AI",
+  "license": "CC-BY-4.0",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "source": "Various Singapore legal sources",
+  "source_url": "https://data.zeeker.sg/templates/pages/sources",
+  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training",
+  "about_url": "https://data.zeeker.sg/templates/pages/about",
+  "databases": {
+    "*": {
+      "allow_sql": true,
+      "allow_facet": true,
+      "allow_download": true
+    },
+    "plugins": {
+      "datasette-search-all": {
+        "template": "Search across all Singapore legal resources"
+      }
+    },
+    "extra_css_urls": [
+      "/static/css/custom.css"
+    ],
+    "extra_js_urls": [
+      "/static/js/custom.js"
+    ],
+    "menu_links": [
+      {
+        "href": "/",
+        "label": "Home"
+      },
+      {
+        "href": "/-/metadata",
+        "label": "Metadata"
+      }
+    ]
+  }
+}
+
+---
+./requirements.txt
+---
+datasette>=0.64.3
+boto3>=1.28.0
+click>=8.1.3
+python-dotenv>=1.0.0
+
+---
+./scripts/download_from_s3.py
+---
+#!/usr/bin/env python
+"""
+Download SQLite databases from an S3 bucket to local storage.
+"""
+import os
+import sys
+import boto3
+import logging
+from pathlib import Path
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger("s3-downloader")
+
+
+def download_from_s3():
+    """Download all .db files from the specified S3 bucket to /data directory."""
+    # Get S3 configuration from environment variables
+    s3_bucket = os.environ.get("S3_BUCKET")
+    s3_prefix = os.environ.get("S3_PREFIX", "")
+    aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+    if not s3_bucket:
+        logger.error("S3_BUCKET environment variable is required")
+        sys.exit(1)
+
+    # Create data directory if it doesn't exist
+    data_dir = Path("/data")
+    data_dir.mkdir(exist_ok=True)
+
+    try:
+        # Initialize S3 client
+        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+        s3 = boto3.client(
+            "s3",
+            region_name=aws_region,
+            endpoint_url=s3_endpoint_url if s3_endpoint_url else None
+        )
+
+        # List objects in the bucket with the given prefix
+        logger.info(f"Listing objects in s3://{s3_bucket}/{s3_prefix}")
+
+        paginator = s3.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefix)
+
+        # Track if we found any database files
+        found_files = False
+
+        # Download each .db file
+        for page in page_iterator:
+            if "Contents" not in page:
+                continue
+
+            for obj in page["Contents"]:
+                key = obj["Key"]
+
+                # Only download .db files
+                if not key.endswith(".db"):
+                    continue
+
+                found_files = True
+                filename = os.path.basename(key)
+                local_path = data_dir / filename
+
+                logger.info(f"Downloading {key} to {local_path}")
+                s3.download_file(s3_bucket, key, str(local_path))
+                logger.info(f"Successfully downloaded {filename}")
+
+        if not found_files:
+            logger.warning(f"No .db files found in s3://{s3_bucket}/{s3_prefix}")
+
+    except Exception as e:
+        logger.error(f"Error downloading files: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    download_from_s3()
+
+---
+./templates/pages/index.html
+---
+{% extends "default:index.html" %}
+
+{% block extra_head %}
+{{ super() }}
+{% endblock %}
+
+{% block content %}
+<div class="home-info">
+  <h1>Immutable Datasette</h1>
+  <p>This is a custom Datasette instance that loads SQLite databases from an S3 bucket and serves them in immutable mode.</p>
+  <p>The data is read-only and cannot be modified through this interface.</p>
+</div>
+
+<div class="metadata-description">
+  <h2>Available Databases</h2>
+  <p>The following databases are available for exploration:</p>
+</div>
+
+{{ super() }}
+
+<div class="metadata-description">
+  <h2>About this Instance</h2>
+  <p>This Datasette instance automatically downloads databases from the configured S3 bucket on startup.</p>
+  <p>All data is served in immutable mode, meaning it cannot be modified through the Datasette interface.</p>
+  <p>The instance is configured with custom templates and styling to enhance the user experience.</p>
+  
+  <h3>Features</h3>
+  <ul>
+    <li>Automatic database downloads from S3</li>
+    <li>Immutable data access</li>
+    <li>Custom styling and templates</li>
+    <li>Full-text search capabilities</li>
+    <li>API access to all data</li>
+  </ul>
+</div>
+{% endblock %}
+
+---
+./static/js/custom.js
+---
+// Custom JavaScript for enhanced Datasette functionality
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Add a class to the body indicating this is the immutable version
+  document.body.classList.add('immutable-datasette');
+
+  // Add a banner indicating this is immutable data
+  if (document.querySelector('header')) {
+    const banner = document.createElement('div');
+    banner.className = 'immutable-banner';
+    banner.innerHTML = '<strong>Immutable Data:</strong> This Datasette instance serves data in read-only mode.';
+    banner.style.backgroundColor = '#FFFDE7';
+    banner.style.padding = '8px 16px';
+    banner.style.textAlign = 'center';
+    banner.style.borderBottom = '1px solid #E0E0E0';
+
+    const header = document.querySelector('header');
+    header.parentNode.insertBefore(banner, header.nextSibling);
+  }
+
+  // Add copy buttons to SQL queries
+  const sqlTextareas = document.querySelectorAll('textarea.sql');
+  sqlTextareas.forEach(function(textarea) {
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy SQL';
+    copyButton.className = 'copy-sql';
+    copyButton.style.fontSize = '12px';
+    copyButton.style.padding = '2px 6px';
+    copyButton.style.marginLeft = '8px';
+
+    copyButton.addEventListener('click', function() {
+      textarea.select();
+      document.execCommand('copy');
+
+      // Show copied confirmation
+      const origText = copyButton.textContent;
+      copyButton.textContent = 'Copied!';
+      setTimeout(function() {
+        copyButton.textContent = origText;
+      }, 1500);
+    });
+
+    textarea.parentNode.insertBefore(copyButton, textarea.nextSibling);
+  });
+});
+
+---
+./static/css/custom.css
+---
+/* Custom styles for Zeeker Datasette */
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+header {
+  background-color: #0366d6;
+  color: white;
+}
+
+.metadata-description {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 1em;
+  line-height: 1.5;
+}
+
+table.rows-and-columns {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.rows-and-columns th {
+  background-color: #f1f8ff;
+  border-bottom: 2px solid #0366d6;
+}
+
+table.rows-and-columns td {
+  border-bottom: 1px solid #e1e4e8;
+  padding: 0.5em;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.home-info {
+  margin: 2em 0;
+  padding: 1em;
+  background-color: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+}
+
+---

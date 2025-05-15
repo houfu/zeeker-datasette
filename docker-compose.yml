@@ -1,0 +1,29 @@
+services:
+  zeeker-datasette:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zeeker-datasette
+    ports:
+      - "8001:8001"
+    environment:
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_PREFIX=${S3_PREFIX:-latest}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - AWS_REGION=${AWS_REGION:-default}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      # For development, you can mount these directories to make changes without rebuilding
+      - ./templates:/app/templates
+      - ./static:/app/static
+      - ./plugins:/app/plugins
+      - ./metadata.json:/app/metadata.json
+    restart: unless-stopped
+    # Add health checks to docker-compose.yml
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8001/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
