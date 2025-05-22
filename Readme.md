@@ -22,8 +22,8 @@ repository, eg. [sglawwatch-to-sqlite](https://github.com/houfu/sglawwatch-to-sq
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/data-zeeker-sg.git
-   cd data-zeeker-sg
+   git clone https://github.com/houfu/zeeker-datasette.git
+   cd zeeker-datasette
    ```
 
 2. Configure environment variables:
@@ -39,7 +39,7 @@ repository, eg. [sglawwatch-to-sqlite](https://github.com/houfu/sglawwatch-to-sq
 
 3. Build and start the Docker container:
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. Access the application at http://localhost:8001
