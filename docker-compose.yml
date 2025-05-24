@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: zeeker-datasette
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     environment:
       - S3_BUCKET=${S3_BUCKET}
       - S3_PREFIX=${S3_PREFIX:-latest}
