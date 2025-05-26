@@ -1,6 +1,11 @@
-./Dockerfile
----
+<documents>
+<document index="1">
+<source>./Dockerfile</source>
+<document_content>
 FROM python:3.11-slim
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
@@ -8,9 +13,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     gcc \
     libsqlite3-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
+COPY pyproject.toml uv.lock* ./
 COPY requirements.txt .
 COPY scripts/ ./scripts/
 COPY metadata.json .
@@ -18,10 +25,14 @@ COPY templates/ ./templates/
 COPY static/ ./static/
 COPY plugins/ ./plugins/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies with uv (faster) but fallback to pip
+RUN if [ -f "uv.lock" ]; then \
+        uv sync --frozen; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
 
-# Create data directory for downloaded databases
+# Create data directory
 RUN mkdir -p /data
 
 # Environment variables
@@ -31,7 +42,7 @@ ENV DATASETTE_PLUGINS_DIR=/app/plugins
 ENV DATASETTE_STATIC_DIR=/app/static
 ENV DATASETTE_METADATA=/app/metadata.json
 
-# Port for Datasette to listen on
+# Port for Datasette
 EXPOSE 8001
 
 # Entry point script
@@ -39,10 +50,121 @@ COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
 ENTRYPOINT ["/app/entrypoint.sh"]
+</document_content>
+</document>
+<document index="2">
+<source>./LICENSE</source>
+<document_content>
+MIT License
+Copyright (c) 2025 Ang Hou Fu
 
----
-./docker-compose.yml
----
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+</document_content>
+</document>
+<document index="3">
+<source>./Readme.md</source>
+<document_content>
+# data.zeeker.sg
+
+A Docker-based Datasette application that serves Singapore's open legal data resources in an immutable (read-only) mode. This project automatically downloads SQLite databases from S3 and provides a clean interface for exploring and analyzing legal data.
+
+## Features
+
+- Automatic download of databases from S3 on startup
+- Immutable data access (read-only mode)
+- Custom styling and templates for enhanced user experience
+- Full-text search capabilities across all legal resources
+- RESTful API access to all data
+- Docker containerization for easy deployment
+
+## Prerequisites
+
+- Docker and Docker Compose
+- AWS credentials for S3 access (if using remote storage)
+- This repository doesn't contain any data. To make your own data source, visit my other
+repository, eg. [sglawwatch-to-sqlite](https://github.com/houfu/sglawwatch-to-sqlite)
+
+## Getting Started
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/houfu/zeeker-datasette.git
+   cd zeeker-datasette
+   ```
+
+2. Configure environment variables:
+   Create a `.env` file with the following variables:
+   ```
+   S3_BUCKET=your-s3-bucket
+   S3_PREFIX=latest
+   S3_ENDPOINT_URL=https://s3.amazonaws.com
+   AWS_REGION=ap-southeast-1
+   AWS_ACCESS_KEY_ID=your-access-key
+   AWS_SECRET_ACCESS_KEY=your-secret-key
+   ```
+
+3. Build and start the Docker container:
+   ```bash
+   docker compose up -d
+   ```
+
+4. Access the application at http://localhost:8001
+
+## Configuration
+
+### Environment Variables
+
+- `S3_BUCKET`: S3 bucket containing SQLite database files
+- `S3_PREFIX`: Directory prefix within the S3 bucket (default: "latest")
+- `S3_ENDPOINT_URL`: S3 endpoint URL (optional for custom endpoints)
+- `AWS_REGION`: AWS region (default: "default")
+- `AWS_ACCESS_KEY_ID`: AWS access key
+- `AWS_SECRET_ACCESS_KEY`: AWS secret key
+
+### Project Structure
+
+- `/templates`: Custom HTML templates
+- `/static`: CSS and JavaScript files
+- `/plugins`: Datasette plugins
+- `/scripts`: Utility scripts for downloading databases
+- `metadata.json`: Datasette instance configuration
+
+## Development
+
+For development, the Docker Compose file mounts local directories:
+
+```bash
+# Make changes to templates, static files, or plugins
+# The container will use these files directly without rebuilding
+
+# To rebuild the container after changing Dockerfile or requirements:
+docker-compose up -d --build
+```
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+</document_content>
+</document>
+<document index="4">
+<source>./docker-compose.yml</source>
+<document_content>
 services:
   zeeker-datasette:
     build:
@@ -50,7 +172,7 @@ services:
       dockerfile: Dockerfile
     container_name: zeeker-datasette
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     environment:
       - S3_BUCKET=${S3_BUCKET}
       - S3_PREFIX=${S3_PREFIX:-latest}
@@ -59,23 +181,24 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
     volumes:
-      # For development, you can mount these directories to make changes without rebuilding
       - ./templates:/app/templates
       - ./static:/app/static
       - ./plugins:/app/plugins
       - ./metadata.json:/app/metadata.json
+      # Mount local data directory for refresh functionality
+      - ./data:/data
     restart: unless-stopped
-    # Add health checks to docker-compose.yml
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8001/" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-
----
-./entrypoint.sh
----
+</document_content>
+</document>
+<document index="5">
+<source>./entrypoint.sh</source>
+<document_content>
 #!/bin/bash
 set -e
 
@@ -105,124 +228,11 @@ exec datasette serve --host 0.0.0.0 --port 8001 \
     --static /static:/app/static \
     --immutable \
     /data/*.db
-
----
-./llms.txt
----
-./Dockerfile
----
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy project files
-COPY requirements.txt .
-COPY scripts/ ./scripts/
-COPY metadata.json .
-COPY templates/ ./templates/
-COPY static/ ./static/
-COPY plugins/ ./plugins/
-
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Create data directory for downloaded databases
-RUN mkdir -p /data
-
-# Environment variables
-ENV DATASETTE_DATABASE_DIR=/data
-ENV DATASETTE_TEMPLATE_DIR=/app/templates
-ENV DATASETTE_PLUGINS_DIR=/app/plugins
-ENV DATASETTE_STATIC_DIR=/app/static
-ENV DATASETTE_METADATA=/app/metadata.json
-
-# Port for Datasette to listen on
-EXPOSE 8001
-
-# Entry point script
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
-
-ENTRYPOINT ["/app/entrypoint.sh"]
-
----
-./docker-compose.yml
----
-services:
-  zeeker-datasette:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: zeeker-datasette
-    ports:
-      - "8001:8001"
-    environment:
-      - S3_BUCKET=${S3_BUCKET}
-      - S3_PREFIX=${S3_PREFIX:-latest}
-      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
-      - AWS_REGION=${AWS_REGION:-default}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    volumes:
-      # For development, you can mount these directories to make changes without rebuilding
-      - ./templates:/app/templates
-      - ./static:/app/static
-      - ./plugins:/app/plugins
-      - ./metadata.json:/app/metadata.json
-    restart: unless-stopped
-    # Add health checks to docker-compose.yml
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8001/" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
----
-./entrypoint.sh
----
-#!/bin/bash
-set -e
-
-# Run the S3 download script if S3_BUCKET is provided
-if [ -n "$S3_BUCKET" ]; then
-    echo "Downloading databases from S3 bucket: $S3_BUCKET"
-    python /app/scripts/download_from_s3.py
-else
-    echo "No S3_BUCKET specified, skipping database download"
-fi
-
-# Check if any databases were downloaded
-if [ -z "$(ls -A /data)" ]; then
-    echo "Warning: No databases found in /data directory"
-fi
-
-# List downloaded databases
-echo "Available databases:"
-ls -la /data
-
-# Start Datasette with immutable flag
-echo "Starting Datasette in immutable mode"
-exec datasette serve --host 0.0.0.0 --port 8001 \
-    --metadata /app/metadata.json \
-    --template-dir /app/templates \
-    --plugins-dir /app/plugins \
-    --static /static:/app/static \
-    --immutable \
-    /data/*.db
-
----
-
-
----
-./metadata.json
----
+</document_content>
+</document>
+<document index="6">
+<source>./metadata.json</source>
+<document_content>
 {
   "title": "data.zeeker.sg",
   "description": "Singapore's open legal data resource for data applications and AI",
@@ -261,18 +271,49 @@ exec datasette serve --host 0.0.0.0 --port 8001 \
     ]
   }
 }
-
----
-./requirements.txt
----
+</document_content>
+</document>
+<document index="7">
+<source>./requirements.txt</source>
+<document_content>
 datasette>=0.64.3
 boto3>=1.28.0
 click>=8.1.3
 python-dotenv>=1.0.0
+</document_content>
+</document>
+<document index="8">
+<source>./zeeker-refresh-cron.sh</source>
+<document_content>
+#!/bin/bash
+set -e
 
----
-./scripts/download_from_s3.py
----
+# Change to project directory
+cd /home/houfu/zeeker-datasette
+
+# Load environment variables from .env file
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
+else
+    echo "Warning: No .env file found"
+fi
+
+# Log start time
+echo "$(date): Starting Datasette refresh..."
+
+# Run refresh using UV
+if uv run scripts/manage.py refresh --verbose; then
+    echo "$(date): Refresh completed successfully"
+    exit 0
+else
+    echo "$(date): Refresh failed" >&2
+    exit 1
+fi
+</document_content>
+</document>
+<document index="9">
+<source>./scripts/download_from_s3.py</source>
+<document_content>
 #!/usr/bin/env python
 """
 Download SQLite databases from an S3 bucket to local storage.
@@ -355,10 +396,269 @@ def download_from_s3():
 
 if __name__ == "__main__":
     download_from_s3()
+</document_content>
+</document>
+<document index="10">
+<source>./scripts/manage.py</source>
+<document_content>
+# !/usr/bin/env python3
+# /// script
+# dependencies = [
+#     "boto3>=1.28.0",
+#     "click>=8.1.3", 
+#     "python-dotenv>=1.0.0",
+# ]
+# ///
+"""
+Management commands for zeeker-datasette with inline dependencies
+"""
+import hashlib
+import logging
+import os
+import shutil
+import subprocess
+from datetime import datetime
+from pathlib import Path
 
----
-./templates/pages/index.html
----
+import boto3
+import click
+from dotenv import load_dotenv
+
+
+def setup_logging(verbose=False):
+    """Setup logging configuration"""
+    level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.FileHandler("/var/log/datasette-refresh.log"),
+            logging.StreamHandler(),
+        ],
+    )
+    return logging.getLogger("datasette-refresh")
+
+
+def calculate_directory_hash(directory):
+    """Calculate hash of all .db files in directory"""
+    hash_md5 = hashlib.md5()
+    directory = Path(directory)
+
+    if not directory.exists():
+        return None
+
+    db_files = sorted(directory.glob("*.db"))
+    for db_file in db_files:
+        if db_file.is_file():
+            with open(db_file, "rb") as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_md5.update(chunk)
+
+    return hash_md5.hexdigest()
+
+
+def download_from_s3_to_dir(target_dir, logger):
+    """Download databases from S3 to specific directory"""
+    s3_bucket = os.environ.get("S3_BUCKET")
+    s3_prefix = os.environ.get("S3_PREFIX", "")
+    aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+    if not s3_bucket:
+        logger.error("S3_BUCKET environment variable is required")
+        return False
+
+    target_path = Path(target_dir)
+    target_path.mkdir(exist_ok=True, parents=True)
+
+    try:
+        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+        s3 = boto3.client(
+            "s3",
+            region_name=aws_region,
+            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
+        )
+
+        logger.info(f"Downloading from s3://{s3_bucket}/{s3_prefix}")
+
+        paginator = s3.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefix)
+
+        found_files = False
+        for page in page_iterator:
+            if "Contents" not in page:
+                continue
+
+            for obj in page["Contents"]:
+                key = obj["Key"]
+                if not key.endswith(".db"):
+                    continue
+
+                found_files = True
+                filename = os.path.basename(key)
+                local_path = target_path / filename
+
+                logger.info(f"Downloading {key} to {local_path}")
+                s3.download_file(s3_bucket, key, str(local_path))
+
+        if not found_files:
+            logger.warning(f"No .db files found in s3://{s3_bucket}/{s3_prefix}")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Error downloading files: {e}")
+        return False
+
+
+@click.group()
+@click.version_option()
+def cli():
+    """Zeeker Datasette Management Commands"""
+    pass
+
+
+@cli.command()
+@click.option("--force", is_flag=True, help="Force refresh even if no changes detected")
+@click.option("--no-restart", is_flag=True, help="Download data but don't restart container")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+@click.option("--staging-dir", default="/tmp/datasette-staging", help="Staging directory")
+def refresh(force, no_restart, verbose, staging_dir):
+    """Refresh Datasette data from S3"""
+    logger = setup_logging(verbose)
+
+    # Load environment variables
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+
+    try:
+        # Get project directory
+        project_dir = Path(__file__).parent.parent
+        data_dir = project_dir / "data"
+        staging_path = Path(staging_dir)
+
+        logger.info("Starting Datasette data refresh")
+
+        # Create directories
+        data_dir.mkdir(exist_ok=True)
+        staging_path.mkdir(exist_ok=True, parents=True)
+
+        # Get current data hash
+        current_hash = calculate_directory_hash(data_dir)
+        logger.debug(f"Current data hash: {current_hash}")
+
+        # Download fresh data
+        logger.info("Downloading fresh data from S3...")
+        if not download_from_s3_to_dir(staging_path, logger):
+            logger.error("Failed to download data from S3")
+            return False
+
+        # Calculate new hash
+        new_hash = calculate_directory_hash(staging_path)
+        logger.debug(f"New data hash: {new_hash}")
+
+        if not force and current_hash == new_hash:
+            logger.info("No data changes detected, skipping update")
+            shutil.rmtree(staging_path)
+            return True
+
+        logger.info("Data changes detected, updating...")
+
+        # Backup current data
+        backup_dir = project_dir / f"data.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        if data_dir.exists() and any(data_dir.glob("*.db")):
+            shutil.copytree(data_dir, backup_dir)
+            logger.info(f"Backed up current data to {backup_dir}")
+
+        # Clear current data and move new data
+        for db_file in data_dir.glob("*.db"):
+            db_file.unlink()
+
+        for db_file in staging_path.glob("*.db"):
+            shutil.move(str(db_file), data_dir / db_file.name)
+            logger.info(f"Updated {db_file.name}")
+
+        shutil.rmtree(staging_path)
+
+        # Restart container unless disabled
+        if not no_restart:
+            logger.info("Restarting Docker container...")
+            result = subprocess.run(
+                ["docker", "compose", "restart", "zeeker-datasette"],
+                cwd=project_dir,
+                capture_output=True,
+                text=True,
+            )
+
+            if result.returncode != 0:
+                logger.error(f"Failed to restart container: {result.stderr}")
+                return False
+
+            logger.info("Container restarted successfully")
+
+        logger.info("Datasette refresh completed successfully")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error during refresh: {e}", exc_info=True)
+        return False
+
+
+@cli.command()
+def status():
+    """Show current status of data and services"""
+    project_dir = Path(__file__).parent.parent
+    data_dir = project_dir / "data"
+
+    click.echo("=== Zeeker Datasette Status ===")
+
+    # Check data directory
+    if not data_dir.exists():
+        click.echo("❌ Data directory does not exist")
+        return
+
+    db_files = list(data_dir.glob("*.db"))
+    if not db_files:
+        click.echo("❌ No database files found")
+    else:
+        click.echo(f"✅ Found {len(db_files)} database file(s):")
+        for db_file in db_files:
+            size = db_file.stat().st_size / (1024 * 1024)  # MB
+            mtime = datetime.fromtimestamp(db_file.stat().st_mtime)
+            click.echo(f"   📁 {db_file.name} ({size:.1f}MB, modified: {mtime})")
+
+    # Check Docker container
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "ps", "zeeker-datasette"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and "Up" in result.stdout:
+            click.echo("✅ Docker container is running")
+        else:
+            click.echo("❌ Docker container is not running")
+    except Exception:
+        click.echo("❓ Could not check Docker container status")
+
+    # Check environment
+    env_file = project_dir / ".env"
+    if env_file.exists():
+        click.echo("✅ Environment file found")
+    else:
+        click.echo("❌ No .env file found")
+
+
+if __name__ == "__main__":
+    cli()
+EOF
+
+</document_content>
+</document>
+<document index="11">
+<source>./templates/pages/index.html</source>
+<document_content>
 {% extends "default:index.html" %}
 
 {% block extra_head %}
@@ -395,10 +695,11 @@ if __name__ == "__main__":
   </ul>
 </div>
 {% endblock %}
-
----
-./static/js/custom.js
----
+</document_content>
+</document>
+<document index="12">
+<source>./static/js/custom.js</source>
+<document_content>
 // Custom JavaScript for enhanced Datasette functionality
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -444,10 +745,11 @@ document.addEventListener('DOMContentLoaded', function() {
     textarea.parentNode.insertBefore(copyButton, textarea.nextSibling);
   });
 });
-
----
-./static/css/custom.css
----
+</document_content>
+</document>
+<document index="13">
+<source>./static/css/custom.css</source>
+<document_content>
 /* Custom styles for Zeeker Datasette */
 
 body {
@@ -492,5 +794,6 @@ table.rows-and-columns td {
   border: 1px solid #e1e4e8;
   border-radius: 6px;
 }
-
----
+</document_content>
+</document>
+</documents>
