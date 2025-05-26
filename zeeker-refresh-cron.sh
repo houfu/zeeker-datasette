@@ -2,7 +2,7 @@
 set -e
 
 # Change to project directory
-cd /home/houfu/zeeker-datasette
+cd ~/zeeker-datasette
 
 # Load environment variables from .env file
 if [ -f ".env" ]; then
