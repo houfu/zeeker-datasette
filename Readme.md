@@ -1,80 +1,93 @@
 # data.zeeker.sg
 
-A Docker-based Datasette application that serves Singapore's open legal data resources in an immutable (read-only) mode. This project automatically downloads SQLite databases from S3 and provides a clean interface for exploring and analyzing legal data.
+A containerised **Datasette** deployment that serves Singapore‑focused legal datasets from SQLite files stored in S3. The container runs in *read‑only* (immutable) mode and can refresh itself automatically.
+
+> **Heads‑up!** This repository ships the infrastructure only – it contains **no SQLite data**. To generate your own databases, run the companion ETL project **[sglawwatch‑to‑sqlite](https://github.com/houfu/sglawwatch-to-sqlite)** (or any tool that outputs SQLite) and upload the resulting `.db` files to your S3 bucket.
+
+## Why this project?
+
+* **One‑click deploy** – spin up Datasette with all databases already downloaded.
+* **Immutable** – data cannot be mutated from the UI or API.
+* **Simple refresh** – `scripts/manage.py refresh` pulls newer databases and restarts the container only if hashes changed.
+* **Custom look & feel** – templates, JavaScript and CSS shipped in the image.
+* **Fully portable** – runs anywhere Docker does; no external Python required.
 
 ## Features
 
-- Automatic download of databases from S3 on startup
-- Immutable data access (read-only mode)
-- Custom styling and templates for enhanced user experience
-- Full-text search capabilities across all legal resources
-- RESTful API access to all data
-- Docker containerization for easy deployment
+* Auto‑download every `*.db` file from an S3 bucket at container start‑up (`scripts/download_from_s3.py`).
+* Local cache under `/data`, mounted as `./data` when using *docker‑compose*.
+* Optional nightly refresh via `zeeker-refresh-cron.sh` or manual `uv run scripts/manage.py refresh`.
+* REST‑style JSON API exposed at `/db-name/table.json`, `/-/sql`, etc.
+* Custom home page and banner indicating read‑only mode.
 
-## Prerequisites
+> **Need full‑text search or other plugins?** Add the plugin to `requirements.txt` (or `pyproject.toml`) and rebuild the image.
 
-- Docker and Docker Compose
-- AWS credentials for S3 access (if using remote storage)
-- This repository doesn't contain any data. To make your own data source, visit my other
-repository, eg. [sglawwatch-to-sqlite](https://github.com/houfu/sglawwatch-to-sqlite)
-
-## Getting Started
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/houfu/zeeker-datasette.git
-   cd zeeker-datasette
-   ```
-
-2. Configure environment variables:
-   Create a `.env` file with the following variables:
-   ```
-   S3_BUCKET=your-s3-bucket
-   S3_PREFIX=latest
-   S3_ENDPOINT_URL=https://s3.amazonaws.com
-   AWS_REGION=ap-southeast-1
-   AWS_ACCESS_KEY_ID=your-access-key
-   AWS_SECRET_ACCESS_KEY=your-secret-key
-   ```
-
-3. Build and start the Docker container:
-   ```bash
-   docker compose up -d
-   ```
-
-4. Access the application at http://localhost:8001
-
-## Configuration
-
-### Environment Variables
-
-- `S3_BUCKET`: S3 bucket containing SQLite database files
-- `S3_PREFIX`: Directory prefix within the S3 bucket (default: "latest")
-- `S3_ENDPOINT_URL`: S3 endpoint URL (optional for custom endpoints)
-- `AWS_REGION`: AWS region (default: "default")
-- `AWS_ACCESS_KEY_ID`: AWS access key
-- `AWS_SECRET_ACCESS_KEY`: AWS secret key
-
-### Project Structure
-
-- `/templates`: Custom HTML templates
-- `/static`: CSS and JavaScript files
-- `/plugins`: Datasette plugins
-- `/scripts`: Utility scripts for downloading databases
-- `metadata.json`: Datasette instance configuration
-
-## Development
-
-For development, the Docker Compose file mounts local directories:
+## Quick start (Docker)
 
 ```bash
-# Make changes to templates, static files, or plugins
-# The container will use these files directly without rebuilding
+git clone https://github.com/houfu/zeeker-datasette.git
+cd zeeker-datasette
 
-# To rebuild the container after changing Dockerfile or requirements:
-docker-compose up -d --build
+# Provide your credentials – see .env.example
+cp .env.example .env
+$EDITOR .env
+
+# Build & run
+docker compose up -d
 ```
+
+Browse to **[http://localhost:8001](http://localhost:8001)**.
+
+### Environment variables
+
+| Variable                | Purpose                                             | Required | Default         |
+| ----------------------- | --------------------------------------------------- | -------- | --------------- |
+| `S3_BUCKET`             | Bucket containing the databases                     | ✅        | —               |
+| `S3_PREFIX`             | Prefix/path inside the bucket                       |          | `latest`        |
+| `S3_ENDPOINT_URL`       | Custom S3‑compatible endpoint (e.g. Contabo, MinIO) |          | *(AWS default)* |
+| `AWS_REGION`            | AWS region                                          |          | `us-east-1`     |
+| `AWS_ACCESS_KEY_ID`     | Access key if bucket is private                     |          | —               |
+| `AWS_SECRET_ACCESS_KEY` | Secret key                                          |          | —               |
+
+> **Tip** An example file (`.env.example`) is provided in the repo.
+
+### Refreshing data
+
+Pull new databases and restart the container only if something changed:
+
+```bash
+docker compose run --rm zeeker-datasette \
+    uv run scripts/manage.py refresh
+```
+
+`--help` shows extra flags like `--force` or `--no-restart`. A ready‑to‑use cron wrapper lives in **`zeeker-refresh-cron.sh`**.
+
+## Project layout
+
+```
+├── Dockerfile              # Production image definition
+├── docker-compose.yml      # Local/dev deployment
+├── scripts/
+│   ├── download_from_s3.py # Start‑up download helper
+│   └── manage.py           # CLI for refresh & status
+├── templates/              # Jinja overrides for Datasette
+├── static/                 # Custom JS & CSS
+├── metadata.json           # Datasette configuration
+└── data/                   # Mounted SQLite databases
+```
+
+## Development tips
+
+* The compose file mounts `templates/` and `static/` so you can iterate without rebuilding.
+* To add or update Python dependencies (including Datasette plugins) edit `requirements.txt` or `pyproject.toml` and rebuild:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+* Follow logs with `docker compose logs -f zeeker-datasette`.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT – see [LICENSE](LICENSE).
