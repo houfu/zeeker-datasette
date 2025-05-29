@@ -1,0 +1,459 @@
+{% extends "default:query.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="SQL Query Interface - Zeeker Legal Data Backbone">
+<style>
+  .sql-editor-container {
+    position: relative;
+  }
+  
+  .sql-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+  }
+  
+  .suggestion-item {
+    padding: 0.8rem;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: var(--transition);
+  }
+  
+  .suggestion-item:hover {
+    background: rgba(0, 212, 255, 0.1);
+  }
+  
+  .suggestion-category {
+    font-weight: 600;
+    color: var(--color-accent-cyan);
+    font-size: 0.9rem;
+  }
+  
+  .suggestion-description {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-top: 0.2rem;
+  }
+</style>
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="query-header">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    {% if database %}
+    <a href="/{{ database }}">{{ database|title }}</a>
+    <span class="separator">→</span>
+    <span>SQL Query</span>
+    {% else %}
+    <span>SQL Query</span>
+    {% endif %}
+  </div>
+  
+  <h1>💻 SQL Query Interface</h1>
+  <p class="query-description">Execute custom SQL queries against Singapore's legal databases. Perfect for advanced analysis, data exploration, and research.</p>
+</div>
+
+<div class="sql-editor">
+  <div class="editor-header">
+    <h2>Query Editor</h2>
+    <div class="editor-controls">
+      {% if database %}
+      <span class="current-database">Database: <strong>{{ database }}</strong></span>
+      {% endif %}
+      <button type="button" class="btn btn-secondary" onclick="clearQuery()">Clear</button>
+      <button type="button" class="btn btn-secondary" onclick="formatQuery()">Format</button>
+    </div>
+  </div>
+  
+  <form method="get" class="query-form">
+    {% if database %}
+    <input type="hidden" name="database" value="{{ database }}">
+    {% endif %}
+    
+    <div class="sql-editor-container">
+      <textarea 
+        name="sql" 
+        class="sql-textarea"
+        placeholder="-- Enter your SQL query here
+-- Example: SELECT * FROM table_name LIMIT 10
+-- Use CTRL+Enter to execute"
+        aria-label="SQL Query"
+        rows="10">{{ sql_query or '' }}</textarea>
+      
+      <div class="sql-suggestions" id="sql-suggestions"></div>
+    </div>
+    
+    <div class="query-options">
+      <div class="option-group">
+        <label for="row-limit">Row Limit:</label>
+        <select name="_size" id="row-limit">
+          <option value="100"{% if request.args.get('_size') == '100' %} selected{% endif %}>100</option>
+          <option value="500"{% if request.args.get('_size') == '500' %} selected{% endif %}>500</option>
+          <option value="1000"{% if request.args.get('_size') == '1000' %} selected{% endif %}>1000</option>
+          <option value="5000"{% if request.args.get('_size') == '5000' %} selected{% endif %}>5000</option>
+        </select>
+      </div>
+      
+      <div class="option-group">
+        <label for="output-format">Output Format:</label>
+        <select name="_format" id="output-format">
+          <option value="table"{% if request.args.get('_format') == 'table' or not request.args.get('_format') %} selected{% endif %}>Table</option>
+          <option value="json"{% if request.args.get('_format') == 'json' %} selected{% endif %}>JSON</option>
+          <option value="csv"{% if request.args.get('_format') == 'csv' %} selected{% endif %}>CSV</option>
+        </select>
+      </div>
+      
+      <div class="option-group">
+        <label>
+          <input type="checkbox" name="_trace" value="1"{% if request.args.get('_trace') %} checked{% endif %}>
+          Show execution trace
+        </label>
+      </div>
+    </div>
+    
+    <div class="query-actions">
+      <button type="submit" class="btn btn-primary">⚡ Execute Query</button>
+      <button type="button" class="btn btn-secondary" onclick="saveQuery()">💾 Save Query</button>
+      <button type="button" class="btn btn-secondary" onclick="shareQuery()">🔗 Share</button>
+    </div>
+  </form>
+</div>
+
+{% if not database %}
+<div class="database-selector">
+  <div class="card">
+    <h3>📊 Available Databases</h3>
+    <p>Select a database to explore its tables and run queries:</p>
+    <div class="database-list">
+      {% for db in databases %}
+      <a href="/{{ db.name }}?sql=" class="database-option">
+        <div class="db-name">{{ db.name|title }}</div>
+        {% if db.table_count %}
+        <div class="db-meta">{{ db.table_count }} table{{ db.table_count|pluralize }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="query-examples">
+  <div class="card">
+    <h3>📚 Example Queries</h3>
+    <p>Get started with these common legal data queries:</p>
+    
+    <div class="examples-grid">
+      <div class="example-card">
+        <h4>🏛️ Court Decisions</h4>
+        <pre><code>-- Find recent Supreme Court decisions
+SELECT title, date, summary 
+FROM court_decisions 
+WHERE court = 'Supreme Court' 
+ORDER BY date DESC 
+LIMIT 20;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>📊 Legal Statistics</h4>
+        <pre><code>-- Count cases by court type
+SELECT court, COUNT(*) as case_count
+FROM court_decisions 
+GROUP BY court 
+ORDER BY case_count DESC;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>🔍 Text Search</h4>
+        <pre><code>-- Search for contract law cases
+SELECT title, court, date
+FROM court_decisions 
+WHERE title LIKE '%contract%' 
+   OR summary LIKE '%contract%'
+ORDER BY date DESC;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>📅 Time Analysis</h4>
+        <pre><code>-- Cases by year
+SELECT strftime('%Y', date) as year,
+       COUNT(*) as cases
+FROM court_decisions 
+GROUP BY year 
+ORDER BY year DESC;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>🔗 Table Relationships</h4>
+        <pre><code>-- Join multiple tables
+SELECT d.title, d.date, j.name as judge
+FROM court_decisions d
+JOIN judges j ON d.judge_id = j.id
+WHERE d.date > '2023-01-01';</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>📋 Schema Exploration</h4>
+        <pre><code>-- View all tables in database
+SELECT name, sql 
+FROM sqlite_master 
+WHERE type = 'table' 
+ORDER BY name;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if query_results %}
+<div class="query-results">
+  <div class="results-header">
+    <h2>🎯 Query Results</h2>
+    <div class="results-meta">
+      {% if execution_time %}
+      <span class="execution-time">Executed in {{ execution_time }}ms</span>
+      {% endif %}
+      {% if row_count %}
+      <span class="row-count">{{ "{:,}".format(row_count) }} row{{ row_count|pluralize }}</span>
+      {% endif %}
+    </div>
+    
+    <div class="results-actions">
+      <a href="{{ request.url.replace('_format=table', '_format=json').replace('&_format=table', '&_format=json') }}" class="btn">📊 JSON</a>
+      <a href="{{ request.url.replace('_format=table', '_format=csv').replace('&_format=table', '&_format=csv') }}" class="btn">📈 CSV</a>
+      <button class="btn" onclick="copyResults()">📋 Copy</button>
+    </div>
+  </div>
+  
+  {% if query_results.rows %}
+  <div class="table-wrapper">
+    <table class="rows-and-columns query-results-table">
+      <thead>
+        <tr>
+          {% for column in query_results.columns %}
+          <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in query_results.rows %}
+        <tr>
+          {% for cell in row %}
+          <td>
+            {% if cell is none %}
+            <em class="null-value">NULL</em>
+            {% elif cell|string|length > 200 %}
+            <details class="long-text">
+              <summary>{{ cell|truncate(50) }}</summary>
+              <div class="full-text">{{ cell }}</div>
+            </details>
+            {% else %}
+            {{ cell }}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if query_results.truncated %}
+  <div class="results-truncated">
+    <p>⚠️ Results truncated. Showing first {{ query_results.rows|length }} rows. 
+    <a href="{{ request.url }}&_size=5000">Show more</a> or use LIMIT in your query.</p>
+  </div>
+  {% endif %}
+  
+  {% else %}
+  <div class="no-results">
+    <p>✅ Query executed successfully but returned no rows.</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if query_error %}
+<div class="query-error">
+  <div class="card error-card">
+    <h3>❌ Query Error</h3>
+    <div class="error-message">
+      <code>{{ query_error }}</code>
+    </div>
+    
+    <div class="error-help">
+      <h4>💡 Common Solutions:</h4>
+      <ul>
+        <li>Check table and column names for typos</li>
+        <li>Use double quotes for table names with spaces: <code>"table name"</code></li>
+        <li>Verify JOIN conditions and foreign keys</li>
+        <li>Use single quotes for string literals: <code>'text value'</code></li>
+        <li>Check SQL syntax - SQLite dialect</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="sql-help">
+  <div class="card">
+    <h3>ℹ️ SQL Query Help</h3>
+    
+    <div class="help-sections">
+      <div class="help-section">
+        <h4>🎯 Tips for Legal Data Queries</h4>
+        <ul>
+          <li>Use <code>LIKE '%keyword%'</code> for text searches in legal documents</li>
+          <li>Filter by date ranges: <code>WHERE date BETWEEN '2023-01-01' AND '2024-01-01'</code></li>
+          <li>Group by court type: <code>GROUP BY court</code> for statistical analysis</li>
+          <li>Order by relevance: <code>ORDER BY date DESC, title ASC</code></li>
+          <li>Limit results for large datasets: <code>LIMIT 100</code></li>
+        </ul>
+      </div>
+      
+      <div class="help-section">
+        <h4>⌨️ Keyboard Shortcuts</h4>
+        <ul>
+          <li><kbd>Ctrl+Enter</kbd> - Execute query</li>
+          <li><kbd>Ctrl+/</kbd> - Toggle comments</li>
+          <li><kbd>Tab</kbd> - Indent selected text</li>
+          <li><kbd>Shift+Tab</kbd> - Unindent selected text</li>
+        </ul>
+      </div>
+      
+      <div class="help-section">
+        <h4>🔧 SQLite Functions</h4>
+        <ul>
+          <li><code>strftime('%Y', date)</code> - Extract year from date</li>
+          <li><code>LENGTH(text)</code> - Get text length</li>
+          <li><code>UPPER(text)</code> - Convert to uppercase</li>
+          <li><code>COUNT(*)</code> - Count rows</li>
+          <li><code>GROUP_CONCAT(column)</code> - Concatenate values</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function clearQuery() {
+  document.querySelector('.sql-textarea').value = '';
+}
+
+function formatQuery() {
+  // Basic SQL formatting
+  const textarea = document.querySelector('.sql-textarea');
+  let sql = textarea.value;
+  
+  // Simple formatting rules
+  sql = sql.replace(/\s+/g, ' '); // Normalize whitespace
+  sql = sql.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|ON|AND|OR)\b/gi, '\n$1');
+  sql = sql.replace(/,/g, ',\n  '); // Commas on new lines with indent
+  sql = sql.trim();
+  
+  textarea.value = sql;
+}
+
+function useExample(button) {
+  const code = button.previousElementSibling.textContent;
+  document.querySelector('.sql-textarea').value = code.trim();
+  document.querySelector('.sql-textarea').focus();
+}
+
+function saveQuery() {
+  const sql = document.querySelector('.sql-textarea').value;
+  if (sql.trim()) {
+    localStorage.setItem('saved_sql_query', sql);
+    alert('Query saved locally!');
+  }
+}
+
+function shareQuery() {
+  const sql = document.querySelector('.sql-textarea').value;
+  if (sql.trim()) {
+    const url = new URL(window.location);
+    url.searchParams.set('sql', sql);
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      alert('Query URL copied to clipboard!');
+    });
+  }
+}
+
+function copyResults() {
+  const table = document.querySelector('.query-results-table');
+  if (table) {
+    const text = Array.from(table.querySelectorAll('tr')).map(row => 
+      Array.from(row.querySelectorAll('th, td')).map(cell => cell.textContent.trim()).join('\t')
+    ).join('\n');
+    
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Results copied to clipboard!');
+    });
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    document.querySelector('.query-form').submit();
+  }
+});
+
+// Auto-save query
+const textarea = document.querySelector('.sql-textarea');
+if (textarea) {
+  setInterval(() => {
+    if (textarea.value.trim()) {
+      localStorage.setItem('auto_saved_query', textarea.value);
+    }
+  }, 10000); // Auto-save every 10 seconds
+  
+  // Load auto-saved query if no current query
+  if (!textarea.value.trim()) {
+    const saved = localStorage.getItem('auto_saved_query');
+    if (saved) {
+      textarea.value = saved;
+    }
+  }
+}
+</script>
+{% endblock %}

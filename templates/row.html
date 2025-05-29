@@ -1,0 +1,103 @@
+{% extends "default:row.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="View record details in {{ table }} - {{ database }}">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block title %}{{ display_value or "Record" }} - {{ table }} - {{ database }}{% endblock %}
+
+{% block content %}
+{# Custom header for row pages #}
+<div class="row-header zeeker-custom">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    <a href="/{{ database }}">{{ database|title }}</a>
+    <span class="separator">→</span>
+    <a href="/{{ database }}/{{ table }}">{{ table|title }}</a>
+    <span class="separator">→</span>
+    <span>Record Details</span>
+  </div>
+  
+  <h1>{{ table|title }} Record</h1>
+  
+  {# Display the primary field value if available #}
+  {% if display_value %}
+  <p class="record-title">{{ display_value }}</p>
+  {% endif %}
+  
+  <div class="row-actions">
+    <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
+    <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">📊 JSON</a>
+    <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+  </div>
+</div>
+
+{# Let Datasette handle the row display #}
+{{ super() }}
+
+{# Add custom tools section #}
+<section class="row-tools zeeker-custom">
+  <div class="card">
+    <h2>🛠️ Record Tools</h2>
+    
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>📊 Export Record</h3>
+        <p>Download this record in various formats</p>
+        <div class="export-options">
+          <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">JSON</a>
+          <a href="/{{ database }}/{{ table }}/{{ row_path }}.csv" class="btn">CSV</a>
+        </div>
+      </div>
+      
+      <div class="tool">
+        <h3>🔍 Find Similar</h3>
+        <p>Search for similar records in this table</p>
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
+      </div>
+      
+      <div class="tool">
+        <h3>🔗 Relationships</h3>
+        <p>Explore related data and connections</p>
+        {% if foreign_key_tables %}
+        <div class="related-tables">
+          {% for fk_table in foreign_key_tables %}
+          <a href="/{{ database }}/{{ fk_table.other_table }}" class="btn btn-small">{{ fk_table.other_table|title }}</a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No related tables found</p>
+        {% endif %}
+      </div>
+      
+      <div class="tool">
+        <h3>💻 Query Builder</h3>
+        <p>Build custom queries based on this record</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}+LIMIT+10" class="btn">Query Similar</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

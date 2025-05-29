@@ -1,38 +1,43 @@
 {
-  "title": "data.zeeker.sg",
-  "description": "Singapore's open legal data resource for data applications and AI",
+  "title": "data.zeeker.sg - The Data Backbone",
+  "description": "Singapore's open legal data resource for data applications and AI - Professional, tech-forward data exploration platform",
   "license": "CC-BY-4.0",
   "license_url": "https://creativecommons.org/licenses/by/4.0/",
   "source": "Various Singapore legal sources",
   "source_url": "https://data.zeeker.sg/templates/pages/sources",
-  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training",
+  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training with a cutting-edge interface designed for legal professionals",
   "about_url": "https://data.zeeker.sg/templates/pages/about",
   "databases": {
     "*": {
       "allow_sql": true,
       "allow_facet": true,
       "allow_download": true
+    }
+  },
+  "plugins": {
+    "datasette-search-all": {
+      "template": "Search across all Singapore legal resources"
+    }
+  },
+  "extra_css_urls": [
+    "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
+    "/static/css/zeeker-theme.css"
+  ],
+  "extra_js_urls": [
+    "/static/js/zeeker-enhanced.js"
+  ],
+  "menu_links": [
+    {
+      "href": "/",
+      "label": "Home"
     },
-    "plugins": {
-      "datasette-search-all": {
-        "template": "Search across all Singapore legal resources"
-      }
+    {
+      "href": "/-/metadata",
+      "label": "API Info"
     },
-    "extra_css_urls": [
-      "/static/css/custom.css"
-    ],
-    "extra_js_urls": [
-      "/static/js/custom.js"
-    ],
-    "menu_links": [
-      {
-        "href": "/",
-        "label": "Home"
-      },
-      {
-        "href": "/-/metadata",
-        "label": "Metadata"
-      }
-    ]
-  }
+    {
+      "href": "/templates/pages/about",
+      "label": "About"
+    }
+  ]
 }

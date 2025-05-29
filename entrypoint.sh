@@ -24,6 +24,6 @@ exec datasette serve --host 0.0.0.0 --port 8001 \
     --metadata /app/metadata.json \
     --template-dir /app/templates \
     --plugins-dir /app/plugins \
-    --static /static:/app/static \
+    --static static:/app/static \
     --immutable \
-    /data/*.db
+    $(ls /data/*.db)

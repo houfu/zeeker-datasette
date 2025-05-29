@@ -1,0 +1,295 @@
+{% extends "default:database.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="Explore {{ database }} legal database - {{ database_description or 'Singapore legal data for research and analysis' }}">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="database-header">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    <span>{{ database|title }}</span>
+  </div>
+  
+  <h1>{{ database|title }} Database</h1>
+  
+  {% if database_description %}
+  <p class="database-description">{{ database_description }}</p>
+  {% endif %}
+  
+  <div class="database-stats">
+    {% if tables %}
+    <div class="stat">
+      <span class="stat-number">{{ tables|length }}</span>
+      <span class="stat-label">table{{ tables|length|pluralize }}</span>
+    </div>
+    {% endif %}
+
+    {% if tables %}
+    {% set total_rows = tables|sum(attribute='count')|default(0) %}
+    {% if total_rows > 0 %}
+    <div class="stat">
+      <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
+      <span class="stat-label">total rows</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if database_size is defined and database_size %}
+    <div class="stat">
+      <span class="stat-number">{{ database_size|filesizeformat }}</span>
+      <span class="stat-label">database size</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="database-actions">
+    <form class="search-form" action="/{{ database }}">
+      <input type="search" name="_search" placeholder="Search within {{ database }}..."
+             value="{{ request.args.get('_search', '') }}" aria-label="Search database">
+    </form>
+
+    <div class="export-links">
+      <a href="/{{ database }}.json" class="btn">📊 JSON</a>
+      <a href="/{{ database }}.csv" class="btn">📈 CSV</a>
+      <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn">🔍 Schema</a>
+    </div>
+  </div>
+</div>
+
+{% if search_query %}
+<div class="search-results-header">
+  <h2>Search Results for "{{ search_query }}"</h2>
+  {% if search_results %}
+  <p>Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}</p>
+  {% else %}
+  <p>No tables found matching your search.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if tables %}
+<section class="tables-section">
+  {% if not search_query %}
+  <h2>Available Tables</h2>
+  {% endif %}
+
+  <div class="tables-grid">
+    {% for table in tables %}
+    <div class="card table-card">
+      <div class="table-header">
+        <h3>
+          <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
+        </h3>
+
+        <div class="table-badges">
+          {% if table.count is defined and table.count is not none %}
+          <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
+          {% endif %}
+          
+          {% if table.columns %}
+          <span class="badge badge-columns">{{ table.columns|length }} columns</span>
+          {% endif %}
+          
+          {% if table.fts %}
+          <span class="badge badge-fts">🔍 Searchable</span>
+          {% endif %}
+          
+          {% if table.has_primary_key %}
+          <span class="badge badge-pk">🔑 Primary Key</span>
+          {% endif %}
+        </div>
+      </div>
+      
+      {% if table.description %}
+      <p class="table-description">{{ table.description }}</p>
+      {% endif %}
+      
+      {% if table.columns %}
+      <div class="table-schema">
+        <h4>Key Columns:</h4>
+        <div class="column-list">
+          {% for column in table.columns[:5] %}
+          <div class="column-item">
+            <span class="column-name">{{ column.name }}</span>
+            <span class="column-type">{{ column.type }}</span>
+            {% if column.is_pk %}
+            <span class="column-flag">PK</span>
+            {% endif %}
+            {% if column.notnull %}
+            <span class="column-flag">NOT NULL</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% if table.columns|length > 5 %}
+          <div class="column-item more-columns">
+            <em>...and {{ table.columns|length - 5 }} more column{{ (table.columns|length - 5)|pluralize }}</em>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if table.sample_rows %}
+      <div class="table-preview">
+        <h4>Sample Data:</h4>
+        <div class="preview-table">
+          <table>
+            <thead>
+              <tr>
+                {% for column in table.columns[:3] %}
+                <th>{{ column.name }}</th>
+                {% endfor %}
+                {% if table.columns|length > 3 %}
+                <th>...</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in table.sample_rows[:2] %}
+              <tr>
+                {% for cell in row[:3] %}
+                <td>{{ cell|truncate(30) }}</td>
+                {% endfor %}
+                {% if table.columns|length > 3 %}
+                <td>...</td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      
+      <div class="table-actions">
+        <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore Table</a>
+        <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
+        <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
+        {% if table.fts %}
+        <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="no-tables">
+  <div class="card">
+    <h2>No Tables Available</h2>
+    {% if search_query %}
+    <p>No tables found matching "{{ search_query }}". Try a different search term or <a href="/{{ database }}">view all tables</a>.</p>
+    {% else %}
+    <p>This database doesn't contain any tables yet. Check back later as data is synchronized from the cloud.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if views %}
+<section class="views-section">
+  <h2>Available Views</h2>
+  <div class="views-grid">
+    {% for view in views %}
+    <div class="card view-card">
+      <h3>
+        <a href="/{{ database }}/{{ view.name }}">{{ view.name|title }}</a>
+      </h3>
+      
+      {% if view.description %}
+      <p class="view-description">{{ view.description }}</p>
+      {% endif %}
+      
+      <div class="view-actions">
+        <a href="/{{ database }}/{{ view.name }}" class="btn btn-primary">Query View</a>
+        <a href="/{{ database }}/{{ view.name }}.json" class="btn">JSON</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="database-tools">
+  <div class="card">
+    <h2>🛠️ Database Tools</h2>
+    
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>💻 SQL Query</h3>
+        <p>Run custom SQL queries against this database</p>
+        <a href="/{{ database }}?sql=" class="btn">Open SQL Editor</a>
+      </div>
+      
+      <div class="tool">
+        <h3>📊 Schema Explorer</h3>
+        <p>Explore database structure and relationships</p>
+        <a href="/{{ database }}?sql=SELECT+name,+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name" class="btn">View Schema</a>
+      </div>
+      
+      <div class="tool">
+        <h3>📈 Data Export</h3>
+        <p>Export entire database in various formats</p>
+        <div class="export-options">
+          <a href="/{{ database }}.json" class="btn">Complete JSON</a>
+          <a href="/{{ database }}.csv" class="btn">Complete CSV</a>
+          <a href="/{{ database }}.db" class="btn">SQLite File</a>
+        </div>
+      </div>
+      
+      <div class="tool">
+        <h3>🔍 Advanced Search</h3>
+        <p>Search across all tables in this database</p>
+        <a href="/-/search?database={{ database }}" class="btn">Search Database</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if canned_queries %}
+<section class="canned-queries">
+  <div class="card">
+    <h2>📋 Saved Queries</h2>
+    <p>Pre-built queries for common legal research tasks</p>
+    
+    <div class="queries-grid">
+      {% for query in canned_queries %}
+      <div class="query-card">
+        <h3>{{ query.title }}</h3>
+        {% if query.description %}
+        <p class="query-description">{{ query.description }}</p>
+        {% endif %}
+        <div class="query-actions">
+          <a href="/{{ database }}?{{ query.name }}" class="btn btn-primary">Run Query</a>
+          <a href="/{{ database }}?{{ query.name }}&_format=json" class="btn">JSON</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

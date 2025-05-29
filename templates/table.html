@@ -1,0 +1,160 @@
+{% extends "default:table.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="Explore {{ table }} table in {{ database }} - {{ table_description or 'Singapore legal data' }}">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block title %}
+{# Handle both table pages and row pages #}
+{% if row %}
+  {{ display_value or "Record" }} - {{ table }} - {{ database }}
+{% else %}
+  {{ table }} - {{ database }}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{# Different headers for table vs row pages #}
+{% if row %}
+  {# This is a single row page #}
+  <div class="row-header zeeker-custom">
+    <div class="breadcrumbs">
+      <a href="/">🏠 Home</a>
+      <span class="separator">→</span>
+      <a href="/{{ database }}">{{ database|title }}</a>
+      <span class="separator">→</span>
+      <a href="/{{ database }}/{{ table }}">{{ table|title }}</a>
+      <span class="separator">→</span>
+      <span>Record Details</span>
+    </div>
+
+    <h1>{{ table|title }} Record</h1>
+
+    {% if display_value %}
+    <p class="record-title">{{ display_value }}</p>
+    {% endif %}
+
+    <div class="row-actions">
+      <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
+      <a href="{{ request.url }}.json" class="btn">📊 JSON</a>
+      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+    </div>
+  </div>
+{% else %}
+  {# This is a table listing page #}
+  <div class="table-header zeeker-custom">
+    <div class="breadcrumbs">
+      <a href="/">🏠 Home</a>
+      <span class="separator">→</span>
+      <a href="/{{ database }}">{{ database|title }}</a>
+      <span class="separator">→</span>
+      <span>{{ table|title }}</span>
+    </div>
+
+    <h1>{{ table|title }}</h1>
+
+    <div class="table-actions">
+      <a href="/{{ database }}/{{ table }}.json" class="btn">📊 JSON</a>
+      <a href="/{{ database }}/{{ table }}.csv" class="btn">📈 CSV</a>
+      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">💻 SQL</a>
+    </div>
+  </div>
+{% endif %}
+
+{# Let Datasette handle the core functionality #}
+{{ super() }}
+
+{# Add appropriate tools section #}
+{% if row %}
+  {# Tools for single record #}
+  <section class="row-tools zeeker-custom">
+    <div class="card">
+      <h2>🛠️ Record Tools</h2>
+
+      <div class="tools-grid">
+        <div class="tool">
+          <h3>📊 Export Record</h3>
+          <p>Download this record in various formats</p>
+          <div class="export-options">
+            <a href="{{ request.url }}.json" class="btn">JSON</a>
+          </div>
+        </div>
+
+        <div class="tool">
+          <h3>🔍 Find Similar</h3>
+          <p>Search for similar records</p>
+          <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
+        </div>
+
+        <div class="tool">
+          <h3>💻 Query Builder</h3>
+          <p>Build custom queries</p>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">SQL Editor</a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% else %}
+  {# Tools for table listing #}
+  <section class="table-tools zeeker-custom">
+    <div class="card">
+      <h2>🛠️ Table Tools</h2>
+
+      <div class="tools-grid">
+        <div class="tool">
+          <h3>💻 Custom SQL</h3>
+          <p>Write custom queries against this table</p>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+" class="btn">Open SQL Editor</a>
+        </div>
+
+        <div class="tool">
+          <h3>📊 Export Data</h3>
+          <p>Download table data in various formats</p>
+          <div class="export-options">
+            <a href="/{{ database }}/{{ table }}.json?_shape=array" class="btn">JSON Array</a>
+            <a href="/{{ database }}/{{ table }}.csv" class="btn">CSV File</a>
+          </div>
+        </div>
+
+        <div class="tool">
+          <h3>🔗 API Access</h3>
+          <p>Programmatic access to this table</p>
+          <div class="api-examples">
+            <div class="api-example">
+              <label>REST API:</label>
+              <code>GET {{ request.url_root }}{{ database }}/{{ table }}.json</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool">
+          <h3>📈 Analysis</h3>
+          <p>Quick data analysis and statistics</p>
+          <a href="/{{ database }}?sql=SELECT+COUNT(*)+FROM+%22{{ table }}%22" class="btn">Basic Stats</a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

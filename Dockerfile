@@ -13,20 +13,19 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml uv.lock* ./
+# COPY pyproject.toml uv.lock* ./
 COPY requirements.txt .
-COPY scripts/ ./scripts/
-COPY metadata.json .
-COPY templates/ ./templates/
-COPY static/ ./static/
-COPY plugins/ ./plugins/
-
 # Install Python dependencies with uv (faster) but fallback to pip
 RUN if [ -f "uv.lock" ]; then \
         uv sync --frozen; \
     else \
         pip install --no-cache-dir -r requirements.txt; \
     fi
+COPY scripts/ ./scripts/
+COPY metadata.json .
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY plugins/ ./plugins/
 
 # Create data directory
 RUN mkdir -p /data

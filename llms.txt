@@ -17,20 +17,19 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-COPY pyproject.toml uv.lock* ./
+# COPY pyproject.toml uv.lock* ./
 COPY requirements.txt .
-COPY scripts/ ./scripts/
-COPY metadata.json .
-COPY templates/ ./templates/
-COPY static/ ./static/
-COPY plugins/ ./plugins/
-
 # Install Python dependencies with uv (faster) but fallback to pip
 RUN if [ -f "uv.lock" ]; then \
         uv sync --frozen; \
     else \
         pip install --no-cache-dir -r requirements.txt; \
     fi
+COPY scripts/ ./scripts/
+COPY metadata.json .
+COPY templates/ ./templates/
+COPY static/ ./static/
+COPY plugins/ ./plugins/
 
 # Create data directory
 RUN mkdir -p /data
@@ -82,84 +81,98 @@ SOFTWARE.
 <document_content>
 # data.zeeker.sg
 
-A Docker-based Datasette application that serves Singapore's open legal data resources in an immutable (read-only) mode. This project automatically downloads SQLite databases from S3 and provides a clean interface for exploring and analyzing legal data.
+A containerised **Datasette** deployment that serves Singapore‑focused legal datasets from SQLite files stored in S3. The container runs in *read‑only* (immutable) mode and can refresh itself automatically.
+
+> **Heads‑up!** This repository ships the infrastructure only – it contains **no SQLite data**. To generate your own databases, run the companion ETL project **[sglawwatch‑to‑sqlite](https://github.com/houfu/sglawwatch-to-sqlite)** (or any tool that outputs SQLite) and upload the resulting `.db` files to your S3 bucket.
+
+## Why this project?
+
+* **One‑click deploy** – spin up Datasette with all databases already downloaded.
+* **Immutable** – data cannot be mutated from the UI or API.
+* **Simple refresh** – `scripts/manage.py refresh` pulls newer databases and restarts the container only if hashes changed.
+* **Custom look & feel** – templates, JavaScript and CSS shipped in the image.
+* **Fully portable** – runs anywhere Docker does; no external Python required.
 
 ## Features
 
-- Automatic download of databases from S3 on startup
-- Immutable data access (read-only mode)
-- Custom styling and templates for enhanced user experience
-- Full-text search capabilities across all legal resources
-- RESTful API access to all data
-- Docker containerization for easy deployment
+* Auto‑download every `*.db` file from an S3 bucket at container start‑up (`scripts/download_from_s3.py`).
+* Local cache under `/data`, mounted as `./data` when using *docker‑compose*.
+* Optional nightly refresh via `zeeker-refresh-cron.sh` or manual `uv run scripts/manage.py refresh`.
+* REST‑style JSON API exposed at `/db-name/table.json`, `/-/sql`, etc.
+* Custom home page and banner indicating read‑only mode.
 
-## Prerequisites
+> **Need full‑text search or other plugins?** Add the plugin to `requirements.txt` (or `pyproject.toml`) and rebuild the image.
 
-- Docker and Docker Compose
-- AWS credentials for S3 access (if using remote storage)
-- This repository doesn't contain any data. To make your own data source, visit my other
-repository, eg. [sglawwatch-to-sqlite](https://github.com/houfu/sglawwatch-to-sqlite)
-
-## Getting Started
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/houfu/zeeker-datasette.git
-   cd zeeker-datasette
-   ```
-
-2. Configure environment variables:
-   Create a `.env` file with the following variables:
-   ```
-   S3_BUCKET=your-s3-bucket
-   S3_PREFIX=latest
-   S3_ENDPOINT_URL=https://s3.amazonaws.com
-   AWS_REGION=ap-southeast-1
-   AWS_ACCESS_KEY_ID=your-access-key
-   AWS_SECRET_ACCESS_KEY=your-secret-key
-   ```
-
-3. Build and start the Docker container:
-   ```bash
-   docker compose up -d
-   ```
-
-4. Access the application at http://localhost:8001
-
-## Configuration
-
-### Environment Variables
-
-- `S3_BUCKET`: S3 bucket containing SQLite database files
-- `S3_PREFIX`: Directory prefix within the S3 bucket (default: "latest")
-- `S3_ENDPOINT_URL`: S3 endpoint URL (optional for custom endpoints)
-- `AWS_REGION`: AWS region (default: "default")
-- `AWS_ACCESS_KEY_ID`: AWS access key
-- `AWS_SECRET_ACCESS_KEY`: AWS secret key
-
-### Project Structure
-
-- `/templates`: Custom HTML templates
-- `/static`: CSS and JavaScript files
-- `/plugins`: Datasette plugins
-- `/scripts`: Utility scripts for downloading databases
-- `metadata.json`: Datasette instance configuration
-
-## Development
-
-For development, the Docker Compose file mounts local directories:
+## Quick start (Docker)
 
 ```bash
-# Make changes to templates, static files, or plugins
-# The container will use these files directly without rebuilding
+git clone https://github.com/houfu/zeeker-datasette.git
+cd zeeker-datasette
 
-# To rebuild the container after changing Dockerfile or requirements:
-docker-compose up -d --build
+# Provide your credentials – see .env.example
+cp .env.example .env
+$EDITOR .env
+
+# Build & run
+docker compose up -d
 ```
+
+Browse to **[http://localhost:8001](http://localhost:8001)**.
+
+### Environment variables
+
+| Variable                | Purpose                                             | Required | Default         |
+| ----------------------- | --------------------------------------------------- | -------- | --------------- |
+| `S3_BUCKET`             | Bucket containing the databases                     | ✅        | —               |
+| `S3_PREFIX`             | Prefix/path inside the bucket                       |          | `latest`        |
+| `S3_ENDPOINT_URL`       | Custom S3‑compatible endpoint (e.g. Contabo, MinIO) |          | *(AWS default)* |
+| `AWS_REGION`            | AWS region                                          |          | `us-east-1`     |
+| `AWS_ACCESS_KEY_ID`     | Access key if bucket is private                     |          | —               |
+| `AWS_SECRET_ACCESS_KEY` | Secret key                                          |          | —               |
+
+> **Tip** An example file (`.env.example`) is provided in the repo.
+
+### Refreshing data
+
+Pull new databases and restart the container only if something changed:
+
+```bash
+docker compose run --rm zeeker-datasette \
+    uv run scripts/manage.py refresh
+```
+
+`--help` shows extra flags like `--force` or `--no-restart`. A ready‑to‑use cron wrapper lives in **`zeeker-refresh-cron.sh`**.
+
+## Project layout
+
+```
+├── Dockerfile              # Production image definition
+├── docker-compose.yml      # Local/dev deployment
+├── scripts/
+│   ├── download_from_s3.py # Start‑up download helper
+│   └── manage.py           # CLI for refresh & status
+├── templates/              # Jinja overrides for Datasette
+├── static/                 # Custom JS & CSS
+├── metadata.json           # Datasette configuration
+└── data/                   # Mounted SQLite databases
+```
+
+## Development tips
+
+* The compose file mounts `templates/` and `static/` so you can iterate without rebuilding.
+* To add or update Python dependencies (including Datasette plugins) edit `requirements.txt` or `pyproject.toml` and rebuild:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+* Follow logs with `docker compose logs -f zeeker-datasette`.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT – see [LICENSE](LICENSE).
+
 </document_content>
 </document>
 <document index="4">
@@ -225,51 +238,56 @@ exec datasette serve --host 0.0.0.0 --port 8001 \
     --metadata /app/metadata.json \
     --template-dir /app/templates \
     --plugins-dir /app/plugins \
-    --static /static:/app/static \
+    --static static:/app/static \
     --immutable \
-    /data/*.db
+    $(ls /data/*.db)
 </document_content>
 </document>
 <document index="6">
 <source>./metadata.json</source>
 <document_content>
 {
-  "title": "data.zeeker.sg",
-  "description": "Singapore's open legal data resource for data applications and AI",
+  "title": "data.zeeker.sg - The Data Backbone",
+  "description": "Singapore's open legal data resource for data applications and AI - Professional, tech-forward data exploration platform",
   "license": "CC-BY-4.0",
   "license_url": "https://creativecommons.org/licenses/by/4.0/",
   "source": "Various Singapore legal sources",
   "source_url": "https://data.zeeker.sg/templates/pages/sources",
-  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training",
+  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training with a cutting-edge interface designed for legal professionals",
   "about_url": "https://data.zeeker.sg/templates/pages/about",
   "databases": {
     "*": {
       "allow_sql": true,
       "allow_facet": true,
       "allow_download": true
+    }
+  },
+  "plugins": {
+    "datasette-search-all": {
+      "template": "Search across all Singapore legal resources"
+    }
+  },
+  "extra_css_urls": [
+    "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
+    "/static/css/zeeker-theme.css"
+  ],
+  "extra_js_urls": [
+    "/static/js/zeeker-enhanced.js"
+  ],
+  "menu_links": [
+    {
+      "href": "/",
+      "label": "Home"
     },
-    "plugins": {
-      "datasette-search-all": {
-        "template": "Search across all Singapore legal resources"
-      }
+    {
+      "href": "/-/metadata",
+      "label": "API Info"
     },
-    "extra_css_urls": [
-      "/static/css/custom.css"
-    ],
-    "extra_js_urls": [
-      "/static/js/custom.js"
-    ],
-    "menu_links": [
-      {
-        "href": "/",
-        "label": "Home"
-      },
-      {
-        "href": "/-/metadata",
-        "label": "Metadata"
-      }
-    ]
-  }
+    {
+      "href": "/templates/pages/about",
+      "label": "About"
+    }
+  ]
 }
 </document_content>
 </document>
@@ -280,6 +298,7 @@ datasette>=0.64.3
 boto3>=1.28.0
 click>=8.1.3
 python-dotenv>=1.0.0
+datasette-search-all
 </document_content>
 </document>
 <document index="8">
@@ -289,7 +308,7 @@ python-dotenv>=1.0.0
 set -e
 
 # Change to project directory
-cd /home/houfu/zeeker-datasette
+cd ~/zeeker-datasette
 
 # Load environment variables from .env file
 if [ -f ".env" ]; then
@@ -312,6 +331,129 @@ fi
 </document_content>
 </document>
 <document index="9">
+<source>./plugins/__init__.py</source>
+<document_content>
+
+</document_content>
+</document>
+<document index="10">
+<source>./plugins/template_filters.py</source>
+<document_content>
+"""
+Datasette plugin to add template filters including pluralize and safe formatting
+"""
+from datasette import hookimpl
+from jinja2.runtime import Undefined
+
+
+def pluralize_filter(value, arg="s"):
+    """
+    Returns a plural suffix if the value is not 1.
+
+    Usage in templates:
+    {{ count }} item{{ count|pluralize }}
+    {{ count }} categor{{ count|pluralize:"ies,y" }}
+    """
+    try:
+        # Convert value to int for comparison
+        num_value = int(value) if value is not None else 0
+    except (ValueError, TypeError):
+        # If can't convert to int, assume plural
+        num_value = 0
+
+    if "," not in str(arg):
+        # Simple case: add suffix if not 1
+        return "" if num_value == 1 else str(arg)
+    else:
+        # Django-style: "plural,singular"
+        try:
+            plural, singular = str(arg).split(",", 1)
+            return singular.strip() if num_value == 1 else plural.strip()
+        except (ValueError, AttributeError):
+            return "" if num_value == 1 else "s"
+
+
+def safe_format_filter(value, format_string="{:,}"):
+    """
+    Safely format numbers, handling undefined values
+
+    Usage in templates:
+    {{ count|safe_format }}
+    {{ count|safe_format("{:.2f}") }}
+    """
+    if isinstance(value, Undefined) or value is None:
+        return "—"
+
+    try:
+        # Try to convert to number first
+        if isinstance(value, str):
+            if value.isdigit():
+                value = int(value)
+            else:
+                try:
+                    value = float(value)
+                except ValueError:
+                    return str(value)
+
+        return format_string.format(value)
+    except (ValueError, TypeError):
+        return str(value) if not isinstance(value, Undefined) else "—"
+
+
+def safe_int_filter(value, default=0):
+    """
+    Safely convert value to int, with fallback
+
+    Usage in templates:
+    {{ count|safe_int }}
+    {{ count|safe_int(default=10) }}
+    """
+    if isinstance(value, Undefined) or value is None:
+        return default
+
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def filesizeformat_filter(value):
+    """
+    Format file sizes in human readable format
+    """
+    if isinstance(value, Undefined) or value is None:
+        return "—"
+
+    try:
+        bytes_value = float(value)
+    except (ValueError, TypeError):
+        return str(value)
+
+    if bytes_value < 1024:
+        return f"{bytes_value:.0f} bytes"
+    elif bytes_value < 1024 ** 2:
+        return f"{bytes_value / 1024:.1f} KB"
+    elif bytes_value < 1024 ** 3:
+        return f"{bytes_value / (1024 ** 2):.1f} MB"
+    else:
+        return f"{bytes_value / (1024 ** 3):.1f} GB"
+
+
+@hookimpl
+def prepare_jinja2_environment(env):
+    """Add custom filters to Jinja2 environment"""
+    env.filters["pluralize"] = pluralize_filter
+    env.filters["safe_format"] = safe_format_filter
+    env.filters["safe_int"] = safe_int_filter
+
+    # Only add filesizeformat if not already present
+    if "filesizeformat" not in env.filters:
+        env.filters["filesizeformat"] = filesizeformat_filter
+
+    return env
+</document_content>
+</document>
+<document index="11">
 <source>./scripts/download_from_s3.py</source>
 <document_content>
 #!/usr/bin/env python
@@ -398,7 +540,7 @@ if __name__ == "__main__":
     download_from_s3()
 </document_content>
 </document>
-<document index="10">
+<document index="12">
 <source>./scripts/manage.py</source>
 <document_content>
 # !/usr/bin/env python3
@@ -656,144 +798,3779 @@ EOF
 
 </document_content>
 </document>
-<document index="11">
-<source>./templates/pages/index.html</source>
+<document index="13">
+<source>./templates/database.html</source>
+<document_content>
+{% extends "default:database.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="Explore {{ database }} legal database - {{ database_description or 'Singapore legal data for research and analysis' }}">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="database-header">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    <span>{{ database|title }}</span>
+  </div>
+  
+  <h1>{{ database|title }} Database</h1>
+  
+  {% if database_description %}
+  <p class="database-description">{{ database_description }}</p>
+  {% endif %}
+  
+  <div class="database-stats">
+    {% if tables %}
+    <div class="stat">
+      <span class="stat-number">{{ tables|length }}</span>
+      <span class="stat-label">table{{ tables|length|pluralize }}</span>
+    </div>
+    {% endif %}
+
+    {% if tables %}
+    {% set total_rows = tables|sum(attribute='count')|default(0) %}
+    {% if total_rows > 0 %}
+    <div class="stat">
+      <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
+      <span class="stat-label">total rows</span>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if database_size is defined and database_size %}
+    <div class="stat">
+      <span class="stat-number">{{ database_size|filesizeformat }}</span>
+      <span class="stat-label">database size</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="database-actions">
+    <form class="search-form" action="/{{ database }}">
+      <input type="search" name="_search" placeholder="Search within {{ database }}..."
+             value="{{ request.args.get('_search', '') }}" aria-label="Search database">
+    </form>
+
+    <div class="export-links">
+      <a href="/{{ database }}.json" class="btn">📊 JSON</a>
+      <a href="/{{ database }}.csv" class="btn">📈 CSV</a>
+      <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn">🔍 Schema</a>
+    </div>
+  </div>
+</div>
+
+{% if search_query %}
+<div class="search-results-header">
+  <h2>Search Results for "{{ search_query }}"</h2>
+  {% if search_results %}
+  <p>Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}</p>
+  {% else %}
+  <p>No tables found matching your search.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if tables %}
+<section class="tables-section">
+  {% if not search_query %}
+  <h2>Available Tables</h2>
+  {% endif %}
+
+  <div class="tables-grid">
+    {% for table in tables %}
+    <div class="card table-card">
+      <div class="table-header">
+        <h3>
+          <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
+        </h3>
+
+        <div class="table-badges">
+          {% if table.count is defined and table.count is not none %}
+          <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
+          {% endif %}
+          
+          {% if table.columns %}
+          <span class="badge badge-columns">{{ table.columns|length }} columns</span>
+          {% endif %}
+          
+          {% if table.fts %}
+          <span class="badge badge-fts">🔍 Searchable</span>
+          {% endif %}
+          
+          {% if table.has_primary_key %}
+          <span class="badge badge-pk">🔑 Primary Key</span>
+          {% endif %}
+        </div>
+      </div>
+      
+      {% if table.description %}
+      <p class="table-description">{{ table.description }}</p>
+      {% endif %}
+      
+      {% if table.columns %}
+      <div class="table-schema">
+        <h4>Key Columns:</h4>
+        <div class="column-list">
+          {% for column in table.columns[:5] %}
+          <div class="column-item">
+            <span class="column-name">{{ column.name }}</span>
+            <span class="column-type">{{ column.type }}</span>
+            {% if column.is_pk %}
+            <span class="column-flag">PK</span>
+            {% endif %}
+            {% if column.notnull %}
+            <span class="column-flag">NOT NULL</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+          {% if table.columns|length > 5 %}
+          <div class="column-item more-columns">
+            <em>...and {{ table.columns|length - 5 }} more column{{ (table.columns|length - 5)|pluralize }}</em>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      
+      {% if table.sample_rows %}
+      <div class="table-preview">
+        <h4>Sample Data:</h4>
+        <div class="preview-table">
+          <table>
+            <thead>
+              <tr>
+                {% for column in table.columns[:3] %}
+                <th>{{ column.name }}</th>
+                {% endfor %}
+                {% if table.columns|length > 3 %}
+                <th>...</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in table.sample_rows[:2] %}
+              <tr>
+                {% for cell in row[:3] %}
+                <td>{{ cell|truncate(30) }}</td>
+                {% endfor %}
+                {% if table.columns|length > 3 %}
+                <td>...</td>
+                {% endif %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+      
+      <div class="table-actions">
+        <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore Table</a>
+        <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
+        <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
+        {% if table.fts %}
+        <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="no-tables">
+  <div class="card">
+    <h2>No Tables Available</h2>
+    {% if search_query %}
+    <p>No tables found matching "{{ search_query }}". Try a different search term or <a href="/{{ database }}">view all tables</a>.</p>
+    {% else %}
+    <p>This database doesn't contain any tables yet. Check back later as data is synchronized from the cloud.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% if views %}
+<section class="views-section">
+  <h2>Available Views</h2>
+  <div class="views-grid">
+    {% for view in views %}
+    <div class="card view-card">
+      <h3>
+        <a href="/{{ database }}/{{ view.name }}">{{ view.name|title }}</a>
+      </h3>
+      
+      {% if view.description %}
+      <p class="view-description">{{ view.description }}</p>
+      {% endif %}
+      
+      <div class="view-actions">
+        <a href="/{{ database }}/{{ view.name }}" class="btn btn-primary">Query View</a>
+        <a href="/{{ database }}/{{ view.name }}.json" class="btn">JSON</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="database-tools">
+  <div class="card">
+    <h2>🛠️ Database Tools</h2>
+    
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>💻 SQL Query</h3>
+        <p>Run custom SQL queries against this database</p>
+        <a href="/{{ database }}?sql=" class="btn">Open SQL Editor</a>
+      </div>
+      
+      <div class="tool">
+        <h3>📊 Schema Explorer</h3>
+        <p>Explore database structure and relationships</p>
+        <a href="/{{ database }}?sql=SELECT+name,+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name" class="btn">View Schema</a>
+      </div>
+      
+      <div class="tool">
+        <h3>📈 Data Export</h3>
+        <p>Export entire database in various formats</p>
+        <div class="export-options">
+          <a href="/{{ database }}.json" class="btn">Complete JSON</a>
+          <a href="/{{ database }}.csv" class="btn">Complete CSV</a>
+          <a href="/{{ database }}.db" class="btn">SQLite File</a>
+        </div>
+      </div>
+      
+      <div class="tool">
+        <h3>🔍 Advanced Search</h3>
+        <p>Search across all tables in this database</p>
+        <a href="/-/search?database={{ database }}" class="btn">Search Database</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if canned_queries %}
+<section class="canned-queries">
+  <div class="card">
+    <h2>📋 Saved Queries</h2>
+    <p>Pre-built queries for common legal research tasks</p>
+    
+    <div class="queries-grid">
+      {% for query in canned_queries %}
+      <div class="query-card">
+        <h3>{{ query.title }}</h3>
+        {% if query.description %}
+        <p class="query-description">{{ query.description }}</p>
+        {% endif %}
+        <div class="query-actions">
+          <a href="/{{ database }}?{{ query.name }}" class="btn btn-primary">Run Query</a>
+          <a href="/{{ database }}?{{ query.name }}&_format=json" class="btn">JSON</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+</document_content>
+</document>
+<document index="14">
+<source>./templates/index.html</source>
 <document_content>
 {% extends "default:index.html" %}
 
 {% block extra_head %}
 {{ super() }}
+<meta name="description" content="Zeeker - Singapore's tech-forward legal data backbone for data applications and AI. Professional access to court decisions, legal documents, and regulatory information.">
+<meta name="keywords" content="Singapore law, legal data, court decisions, legal documents, AI training data, legal research">
+<meta property="og:title" content="data.zeeker.sg - The Legal Data Backbone of the Zeeker Project">
+<meta property="og:description" content="A datastore to Singapore's legal data for data applications and AI">
+<meta property="og:type" content="website">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
 {% endblock %}
 
 {% block content %}
-<div class="home-info">
-  <h1>Immutable Datasette</h1>
-  <p>This is a custom Datasette instance that loads SQLite databases from an S3 bucket and serves them in immutable mode.</p>
-  <p>The data is read-only and cannot be modified through this interface.</p>
+<div class="hero-fullscreen">
+  <div class="hero-background-image"></div>
+  <div class="hero-content-overlay">
+    <h1>data.zeeker.sg</h1>
+    <p class="hero-tagline">
+      The data backbone of the Zeeker project, providing access to Singapore's legal data ecosystem.
+    </p>
+
+    <form class="search-form-hero" action="/-/search">
+      <input type="search" name="q" placeholder="Search across all legal databases..." aria-label="Search legal data">
+    </form>
+  </div>
 </div>
 
-<div class="metadata-description">
-  <h2>Available Databases</h2>
-  <p>The following databases are available for exploration:</p>
-</div>
+{% if databases %}
+<section class="databases-section">
+  <h2>Available Legal Resources</h2>
+  <div class="database-grid">
+    {% for database in databases %}
+    <div class="card database-card">
+      <h3>
+        <a href="/{{ database.name }}">{{ database.name|title }}</a>
+      </h3>
+      <div class="database-meta">
+        {% if database.table_count is defined and database.table_count %}
+        <span class="table-count">{{ database.table_count }} table{{ database.table_count|pluralize }}</span>
+        {% endif %}
+        {% if database.size is defined and database.size %}
+        <span class="database-size">{{ database.size|filesizeformat }}</span>
+        {% endif %}
+      </div>
+      {% if database.description %}
+      <p class="database-description">{{ database.description }}</p>
+      {% endif %}
 
-{{ super() }}
+      <div class="database-actions">
+        <a href="/{{ database.name }}" class="btn">Explore Data</a>
+        <a href="/{{ database.name }}.json" class="btn btn-secondary">API</a>
+      </div>
 
-<div class="metadata-description">
-  <h2>About this Instance</h2>
-  <p>This Datasette instance automatically downloads databases from the configured S3 bucket on startup.</p>
-  <p>All data is served in immutable mode, meaning it cannot be modified through the Datasette interface.</p>
-  <p>The instance is configured with custom templates and styling to enhance the user experience.</p>
-  
-  <h3>Features</h3>
-  <ul>
-    <li>Automatic database downloads from S3</li>
-    <li>Immutable data access</li>
-    <li>Custom styling and templates</li>
-    <li>Full-text search capabilities</li>
-    <li>API access to all data</li>
-  </ul>
-</div>
+      {% if database.tables %}
+      <div class="table-preview">
+        <h4>Key Tables:</h4>
+        <ul>
+          {% for table in database.tables[:3] %}
+          <li>
+            <a href="/{{ database.name }}/{{ table.name }}">{{ table.name|title }}</a>
+            {% if table.count is defined and table.count %}<span class="row-count">({{ table.count|safe_format }} rows)</span>{% endif %}
+          </li>
+          {% endfor %}
+          {% if database.tables|length > 3 %}
+          <li><em>...and {{ database.tables|length - 3 }} more</em></li>
+          {% endif %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% else %}
+<section class="no-databases">
+  <div class="card">
+    <h2>🚀 Setting Up Your Legal Data</h2>
+    <p>This Zeeker instance is ready to serve Singapore's legal data. Databases will appear here once they're loaded from your configured S3 bucket.</p>
+
+    <div class="features-grid">
+      <div class="feature">
+        <h3>📊 Immutable Data Access</h3>
+        <p>All legal data is served in read-only mode, ensuring data integrity and compliance.</p>
+      </div>
+      <div class="feature">
+        <h3>🔍 Full-Text Search</h3>
+        <p>Search across all legal documents, court decisions, and regulatory texts instantly.</p>
+      </div>
+      <div class="feature">
+        <h3>🛠️ RESTful API</h3>
+        <p>Programmatic access to all data with JSON and CSV export capabilities.</p>
+      </div>
+      <div class="feature">
+        <h3>⚡ AI-Ready</h3>
+        <p>Structured legal data perfect for machine learning, natural language processing, and legal tech applications.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="about-section">
+  <div class="card">
+    <h2>About This Platform</h2>
+    <p>Zeeker provides professional-grade access to Singapore's legal data ecosystem. Our platform automatically downloads and serves legal databases from secure cloud storage, offering researchers, legal professionals, and technologists reliable access to:</p>
+    
+    <div class="resource-categories">
+      <div class="category">
+        <h3>🏛️ Courts</h3>
+        <p>Supreme Court decisions, High Court judgments, and appellate rulings</p>
+      </div>
+      <div class="category">
+        <h3>🏛️ Government</h3>
+        <p>Parliamentary debates, legislative documents, and regulatory updates</p>
+      </div>
+      <div class="category">
+        <h3>📰 SG Law Watch</h3>
+        <p>Legal news, analysis, and industry developments</p>
+      </div>
+      <div class="category">
+        <h3>📋 Regulations</h3>
+        <p>Statutory instruments, guidelines, and compliance frameworks</p>
+      </div>
+    </div>
+    
+    <div class="features-list">
+      <h3>Platform Features</h3>
+      <ul>
+        <li>Automatic database synchronization from cloud storage</li>
+        <li>Immutable data access ensuring consistency</li>
+        <li>Custom styling optimized for legal professionals</li>
+        <li>Full-text search across all resources</li>
+        <li>RESTful API for programmatic access</li>
+        <li>Export capabilities (JSON, CSV, SQL)</li>
+        <li>Mobile-responsive interface</li>
+        <li>Accessibility-compliant design</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="api-section">
+  <div class="card">
+    <h2>🔌 API Access</h2>
+    <p>Zeeker provides comprehensive API access to all legal data. Perfect for:</p>
+    
+    <div class="api-uses">
+      <div class="use-case">
+        <h3>🤖 AI & Machine Learning</h3>
+        <p>Train models on structured legal text, case outcomes, and regulatory patterns</p>
+      </div>
+      <div class="use-case">
+        <h3>📊 Legal Analytics</h3>
+        <p>Analyze trends in court decisions, regulatory changes, and legal precedents</p>
+      </div>
+      <div class="use-case">
+        <h3>🔍 Legal Research</h3>
+        <p>Programmatic access for legal research tools and citation analysis</p>
+      </div>
+      <div class="use-case">
+        <h3>🏢 Enterprise Integration</h3>
+        <p>Integrate legal data into business intelligence and compliance systems</p>
+      </div>
+    </div>
+    
+    <div class="api-example">
+      <h3>Quick Start</h3>
+      <pre><code># Get all databases
+curl https://data.zeeker.sg/.json
+
+# Search across all data  
+curl "https://data.zeeker.sg/-/search.json?q=contract+law"
+
+# Query specific table
+curl "https://data.zeeker.sg/courts/supreme_court.json?_shape=array"</code></pre>
+    </div>
+    
+    <div class="api-links">
+      <a href="/-/metadata" class="btn">View Full API Documentation</a>
+      <a href="/-/search" class="btn btn-secondary">Try Search API</a>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block footer %}
+<footer>
+  <div class="footer-content">
+    <div class="footer-links">
+      <a href="/">Home</a>
+      <a href="/-/metadata">API Documentation</a>
+      <a href="/templates/pages/about">About</a>
+      <a href="/templates/pages/sources">Data Sources</a>
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">License (CC-BY-4.0)</a>
+    </div>
+    <div class="footer-text">
+      <p>&copy; 2025 Zeeker - Singapore Legal Data Backbone</p>
+      <p>Professional access to legal data for research, analysis, and AI applications</p>
+    </div>
+  </div>
+</footer>
 {% endblock %}
 </document_content>
 </document>
-<document index="12">
-<source>./static/js/custom.js</source>
+<document index="15">
+<source>./templates/query.html</source>
 <document_content>
-// Custom JavaScript for enhanced Datasette functionality
+{% extends "default:query.html" %}
 
-document.addEventListener('DOMContentLoaded', function() {
-  // Add a class to the body indicating this is the immutable version
-  document.body.classList.add('immutable-datasette');
-
-  // Add a banner indicating this is immutable data
-  if (document.querySelector('header')) {
-    const banner = document.createElement('div');
-    banner.className = 'immutable-banner';
-    banner.innerHTML = '<strong>Immutable Data:</strong> This Datasette instance serves data in read-only mode.';
-    banner.style.backgroundColor = '#FFFDE7';
-    banner.style.padding = '8px 16px';
-    banner.style.textAlign = 'center';
-    banner.style.borderBottom = '1px solid #E0E0E0';
-
-    const header = document.querySelector('header');
-    header.parentNode.insertBefore(banner, header.nextSibling);
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="SQL Query Interface - Zeeker Legal Data Backbone">
+<style>
+  .sql-editor-container {
+    position: relative;
   }
+  
+  .sql-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+  }
+  
+  .suggestion-item {
+    padding: 0.8rem;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: var(--transition);
+  }
+  
+  .suggestion-item:hover {
+    background: rgba(0, 212, 255, 0.1);
+  }
+  
+  .suggestion-category {
+    font-weight: 600;
+    color: var(--color-accent-cyan);
+    font-size: 0.9rem;
+  }
+  
+  .suggestion-description {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    margin-top: 0.2rem;
+  }
+</style>
+{% endblock %}
 
-  // Add copy buttons to SQL queries
-  const sqlTextareas = document.querySelectorAll('textarea.sql');
-  sqlTextareas.forEach(function(textarea) {
-    const copyButton = document.createElement('button');
-    copyButton.textContent = 'Copy SQL';
-    copyButton.className = 'copy-sql';
-    copyButton.style.fontSize = '12px';
-    copyButton.style.padding = '2px 6px';
-    copyButton.style.marginLeft = '8px';
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
 
-    copyButton.addEventListener('click', function() {
-      textarea.select();
-      document.execCommand('copy');
+{% block content %}
+<div class="query-header">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    {% if database %}
+    <a href="/{{ database }}">{{ database|title }}</a>
+    <span class="separator">→</span>
+    <span>SQL Query</span>
+    {% else %}
+    <span>SQL Query</span>
+    {% endif %}
+  </div>
+  
+  <h1>💻 SQL Query Interface</h1>
+  <p class="query-description">Execute custom SQL queries against Singapore's legal databases. Perfect for advanced analysis, data exploration, and research.</p>
+</div>
 
-      // Show copied confirmation
-      const origText = copyButton.textContent;
-      copyButton.textContent = 'Copied!';
-      setTimeout(function() {
-        copyButton.textContent = origText;
-      }, 1500);
+<div class="sql-editor">
+  <div class="editor-header">
+    <h2>Query Editor</h2>
+    <div class="editor-controls">
+      {% if database %}
+      <span class="current-database">Database: <strong>{{ database }}</strong></span>
+      {% endif %}
+      <button type="button" class="btn btn-secondary" onclick="clearQuery()">Clear</button>
+      <button type="button" class="btn btn-secondary" onclick="formatQuery()">Format</button>
+    </div>
+  </div>
+  
+  <form method="get" class="query-form">
+    {% if database %}
+    <input type="hidden" name="database" value="{{ database }}">
+    {% endif %}
+    
+    <div class="sql-editor-container">
+      <textarea 
+        name="sql" 
+        class="sql-textarea"
+        placeholder="-- Enter your SQL query here
+-- Example: SELECT * FROM table_name LIMIT 10
+-- Use CTRL+Enter to execute"
+        aria-label="SQL Query"
+        rows="10">{{ sql_query or '' }}</textarea>
+      
+      <div class="sql-suggestions" id="sql-suggestions"></div>
+    </div>
+    
+    <div class="query-options">
+      <div class="option-group">
+        <label for="row-limit">Row Limit:</label>
+        <select name="_size" id="row-limit">
+          <option value="100"{% if request.args.get('_size') == '100' %} selected{% endif %}>100</option>
+          <option value="500"{% if request.args.get('_size') == '500' %} selected{% endif %}>500</option>
+          <option value="1000"{% if request.args.get('_size') == '1000' %} selected{% endif %}>1000</option>
+          <option value="5000"{% if request.args.get('_size') == '5000' %} selected{% endif %}>5000</option>
+        </select>
+      </div>
+      
+      <div class="option-group">
+        <label for="output-format">Output Format:</label>
+        <select name="_format" id="output-format">
+          <option value="table"{% if request.args.get('_format') == 'table' or not request.args.get('_format') %} selected{% endif %}>Table</option>
+          <option value="json"{% if request.args.get('_format') == 'json' %} selected{% endif %}>JSON</option>
+          <option value="csv"{% if request.args.get('_format') == 'csv' %} selected{% endif %}>CSV</option>
+        </select>
+      </div>
+      
+      <div class="option-group">
+        <label>
+          <input type="checkbox" name="_trace" value="1"{% if request.args.get('_trace') %} checked{% endif %}>
+          Show execution trace
+        </label>
+      </div>
+    </div>
+    
+    <div class="query-actions">
+      <button type="submit" class="btn btn-primary">⚡ Execute Query</button>
+      <button type="button" class="btn btn-secondary" onclick="saveQuery()">💾 Save Query</button>
+      <button type="button" class="btn btn-secondary" onclick="shareQuery()">🔗 Share</button>
+    </div>
+  </form>
+</div>
+
+{% if not database %}
+<div class="database-selector">
+  <div class="card">
+    <h3>📊 Available Databases</h3>
+    <p>Select a database to explore its tables and run queries:</p>
+    <div class="database-list">
+      {% for db in databases %}
+      <a href="/{{ db.name }}?sql=" class="database-option">
+        <div class="db-name">{{ db.name|title }}</div>
+        {% if db.table_count %}
+        <div class="db-meta">{{ db.table_count }} table{{ db.table_count|pluralize }}</div>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="query-examples">
+  <div class="card">
+    <h3>📚 Example Queries</h3>
+    <p>Get started with these common legal data queries:</p>
+    
+    <div class="examples-grid">
+      <div class="example-card">
+        <h4>🏛️ Court Decisions</h4>
+        <pre><code>-- Find recent Supreme Court decisions
+SELECT title, date, summary 
+FROM court_decisions 
+WHERE court = 'Supreme Court' 
+ORDER BY date DESC 
+LIMIT 20;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>📊 Legal Statistics</h4>
+        <pre><code>-- Count cases by court type
+SELECT court, COUNT(*) as case_count
+FROM court_decisions 
+GROUP BY court 
+ORDER BY case_count DESC;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>🔍 Text Search</h4>
+        <pre><code>-- Search for contract law cases
+SELECT title, court, date
+FROM court_decisions 
+WHERE title LIKE '%contract%' 
+   OR summary LIKE '%contract%'
+ORDER BY date DESC;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>📅 Time Analysis</h4>
+        <pre><code>-- Cases by year
+SELECT strftime('%Y', date) as year,
+       COUNT(*) as cases
+FROM court_decisions 
+GROUP BY year 
+ORDER BY year DESC;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>🔗 Table Relationships</h4>
+        <pre><code>-- Join multiple tables
+SELECT d.title, d.date, j.name as judge
+FROM court_decisions d
+JOIN judges j ON d.judge_id = j.id
+WHERE d.date > '2023-01-01';</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+      
+      <div class="example-card">
+        <h4>📋 Schema Exploration</h4>
+        <pre><code>-- View all tables in database
+SELECT name, sql 
+FROM sqlite_master 
+WHERE type = 'table' 
+ORDER BY name;</code></pre>
+        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if query_results %}
+<div class="query-results">
+  <div class="results-header">
+    <h2>🎯 Query Results</h2>
+    <div class="results-meta">
+      {% if execution_time %}
+      <span class="execution-time">Executed in {{ execution_time }}ms</span>
+      {% endif %}
+      {% if row_count %}
+      <span class="row-count">{{ "{:,}".format(row_count) }} row{{ row_count|pluralize }}</span>
+      {% endif %}
+    </div>
+    
+    <div class="results-actions">
+      <a href="{{ request.url.replace('_format=table', '_format=json').replace('&_format=table', '&_format=json') }}" class="btn">📊 JSON</a>
+      <a href="{{ request.url.replace('_format=table', '_format=csv').replace('&_format=table', '&_format=csv') }}" class="btn">📈 CSV</a>
+      <button class="btn" onclick="copyResults()">📋 Copy</button>
+    </div>
+  </div>
+  
+  {% if query_results.rows %}
+  <div class="table-wrapper">
+    <table class="rows-and-columns query-results-table">
+      <thead>
+        <tr>
+          {% for column in query_results.columns %}
+          <th>{{ column }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in query_results.rows %}
+        <tr>
+          {% for cell in row %}
+          <td>
+            {% if cell is none %}
+            <em class="null-value">NULL</em>
+            {% elif cell|string|length > 200 %}
+            <details class="long-text">
+              <summary>{{ cell|truncate(50) }}</summary>
+              <div class="full-text">{{ cell }}</div>
+            </details>
+            {% else %}
+            {{ cell }}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  
+  {% if query_results.truncated %}
+  <div class="results-truncated">
+    <p>⚠️ Results truncated. Showing first {{ query_results.rows|length }} rows. 
+    <a href="{{ request.url }}&_size=5000">Show more</a> or use LIMIT in your query.</p>
+  </div>
+  {% endif %}
+  
+  {% else %}
+  <div class="no-results">
+    <p>✅ Query executed successfully but returned no rows.</p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if query_error %}
+<div class="query-error">
+  <div class="card error-card">
+    <h3>❌ Query Error</h3>
+    <div class="error-message">
+      <code>{{ query_error }}</code>
+    </div>
+    
+    <div class="error-help">
+      <h4>💡 Common Solutions:</h4>
+      <ul>
+        <li>Check table and column names for typos</li>
+        <li>Use double quotes for table names with spaces: <code>"table name"</code></li>
+        <li>Verify JOIN conditions and foreign keys</li>
+        <li>Use single quotes for string literals: <code>'text value'</code></li>
+        <li>Check SQL syntax - SQLite dialect</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="sql-help">
+  <div class="card">
+    <h3>ℹ️ SQL Query Help</h3>
+    
+    <div class="help-sections">
+      <div class="help-section">
+        <h4>🎯 Tips for Legal Data Queries</h4>
+        <ul>
+          <li>Use <code>LIKE '%keyword%'</code> for text searches in legal documents</li>
+          <li>Filter by date ranges: <code>WHERE date BETWEEN '2023-01-01' AND '2024-01-01'</code></li>
+          <li>Group by court type: <code>GROUP BY court</code> for statistical analysis</li>
+          <li>Order by relevance: <code>ORDER BY date DESC, title ASC</code></li>
+          <li>Limit results for large datasets: <code>LIMIT 100</code></li>
+        </ul>
+      </div>
+      
+      <div class="help-section">
+        <h4>⌨️ Keyboard Shortcuts</h4>
+        <ul>
+          <li><kbd>Ctrl+Enter</kbd> - Execute query</li>
+          <li><kbd>Ctrl+/</kbd> - Toggle comments</li>
+          <li><kbd>Tab</kbd> - Indent selected text</li>
+          <li><kbd>Shift+Tab</kbd> - Unindent selected text</li>
+        </ul>
+      </div>
+      
+      <div class="help-section">
+        <h4>🔧 SQLite Functions</h4>
+        <ul>
+          <li><code>strftime('%Y', date)</code> - Extract year from date</li>
+          <li><code>LENGTH(text)</code> - Get text length</li>
+          <li><code>UPPER(text)</code> - Convert to uppercase</li>
+          <li><code>COUNT(*)</code> - Count rows</li>
+          <li><code>GROUP_CONCAT(column)</code> - Concatenate values</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function clearQuery() {
+  document.querySelector('.sql-textarea').value = '';
+}
+
+function formatQuery() {
+  // Basic SQL formatting
+  const textarea = document.querySelector('.sql-textarea');
+  let sql = textarea.value;
+  
+  // Simple formatting rules
+  sql = sql.replace(/\s+/g, ' '); // Normalize whitespace
+  sql = sql.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|ON|AND|OR)\b/gi, '\n$1');
+  sql = sql.replace(/,/g, ',\n  '); // Commas on new lines with indent
+  sql = sql.trim();
+  
+  textarea.value = sql;
+}
+
+function useExample(button) {
+  const code = button.previousElementSibling.textContent;
+  document.querySelector('.sql-textarea').value = code.trim();
+  document.querySelector('.sql-textarea').focus();
+}
+
+function saveQuery() {
+  const sql = document.querySelector('.sql-textarea').value;
+  if (sql.trim()) {
+    localStorage.setItem('saved_sql_query', sql);
+    alert('Query saved locally!');
+  }
+}
+
+function shareQuery() {
+  const sql = document.querySelector('.sql-textarea').value;
+  if (sql.trim()) {
+    const url = new URL(window.location);
+    url.searchParams.set('sql', sql);
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      alert('Query URL copied to clipboard!');
     });
+  }
+}
 
-    textarea.parentNode.insertBefore(copyButton, textarea.nextSibling);
-  });
+function copyResults() {
+  const table = document.querySelector('.query-results-table');
+  if (table) {
+    const text = Array.from(table.querySelectorAll('tr')).map(row => 
+      Array.from(row.querySelectorAll('th, td')).map(cell => cell.textContent.trim()).join('\t')
+    ).join('\n');
+    
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Results copied to clipboard!');
+    });
+  }
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    document.querySelector('.query-form').submit();
+  }
 });
+
+// Auto-save query
+const textarea = document.querySelector('.sql-textarea');
+if (textarea) {
+  setInterval(() => {
+    if (textarea.value.trim()) {
+      localStorage.setItem('auto_saved_query', textarea.value);
+    }
+  }, 10000); // Auto-save every 10 seconds
+  
+  // Load auto-saved query if no current query
+  if (!textarea.value.trim()) {
+    const saved = localStorage.getItem('auto_saved_query');
+    if (saved) {
+      textarea.value = saved;
+    }
+  }
+}
+</script>
+{% endblock %}
 </document_content>
 </document>
-<document index="13">
-<source>./static/css/custom.css</source>
+<document index="16">
+<source>./templates/row.html</source>
 <document_content>
-/* Custom styles for Zeeker Datasette */
+{% extends "default:row.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="View record details in {{ table }} - {{ database }}">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block title %}{{ display_value or "Record" }} - {{ table }} - {{ database }}{% endblock %}
+
+{% block content %}
+{# Custom header for row pages #}
+<div class="row-header zeeker-custom">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    <a href="/{{ database }}">{{ database|title }}</a>
+    <span class="separator">→</span>
+    <a href="/{{ database }}/{{ table }}">{{ table|title }}</a>
+    <span class="separator">→</span>
+    <span>Record Details</span>
+  </div>
+  
+  <h1>{{ table|title }} Record</h1>
+  
+  {# Display the primary field value if available #}
+  {% if display_value %}
+  <p class="record-title">{{ display_value }}</p>
+  {% endif %}
+  
+  <div class="row-actions">
+    <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
+    <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">📊 JSON</a>
+    <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+  </div>
+</div>
+
+{# Let Datasette handle the row display #}
+{{ super() }}
+
+{# Add custom tools section #}
+<section class="row-tools zeeker-custom">
+  <div class="card">
+    <h2>🛠️ Record Tools</h2>
+    
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>📊 Export Record</h3>
+        <p>Download this record in various formats</p>
+        <div class="export-options">
+          <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">JSON</a>
+          <a href="/{{ database }}/{{ table }}/{{ row_path }}.csv" class="btn">CSV</a>
+        </div>
+      </div>
+      
+      <div class="tool">
+        <h3>🔍 Find Similar</h3>
+        <p>Search for similar records in this table</p>
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
+      </div>
+      
+      <div class="tool">
+        <h3>🔗 Relationships</h3>
+        <p>Explore related data and connections</p>
+        {% if foreign_key_tables %}
+        <div class="related-tables">
+          {% for fk_table in foreign_key_tables %}
+          <a href="/{{ database }}/{{ fk_table.other_table }}" class="btn btn-small">{{ fk_table.other_table|title }}</a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted">No related tables found</p>
+        {% endif %}
+      </div>
+      
+      <div class="tool">
+        <h3>💻 Query Builder</h3>
+        <p>Build custom queries based on this record</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}+LIMIT+10" class="btn">Query Similar</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+</document_content>
+</document>
+<document index="17">
+<source>./templates/table.html</source>
+<document_content>
+{% extends "default:table.html" %}
+
+{% block extra_head %}
+{{ super() }}
+<meta name="description" content="Explore {{ table }} table in {{ database }} - {{ table_description or 'Singapore legal data' }}">
+{% endblock %}
+
+{% block nav %}
+<header>
+  <div class="header-content">
+    <div class="header-left">
+      <div class="logo">
+        <a href="/">ZEEKER</a>
+      </div>
+      <div class="tagline">The Legal Data Backbone</div>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/-/metadata">API Info</a></li>
+        <li><a href="/templates/pages/about">About</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block title %}
+{# Handle both table pages and row pages #}
+{% if row %}
+  {{ display_value or "Record" }} - {{ table }} - {{ database }}
+{% else %}
+  {{ table }} - {{ database }}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{# Different headers for table vs row pages #}
+{% if row %}
+  {# This is a single row page #}
+  <div class="row-header zeeker-custom">
+    <div class="breadcrumbs">
+      <a href="/">🏠 Home</a>
+      <span class="separator">→</span>
+      <a href="/{{ database }}">{{ database|title }}</a>
+      <span class="separator">→</span>
+      <a href="/{{ database }}/{{ table }}">{{ table|title }}</a>
+      <span class="separator">→</span>
+      <span>Record Details</span>
+    </div>
+
+    <h1>{{ table|title }} Record</h1>
+
+    {% if display_value %}
+    <p class="record-title">{{ display_value }}</p>
+    {% endif %}
+
+    <div class="row-actions">
+      <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
+      <a href="{{ request.url }}.json" class="btn">📊 JSON</a>
+      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+    </div>
+  </div>
+{% else %}
+  {# This is a table listing page #}
+  <div class="table-header zeeker-custom">
+    <div class="breadcrumbs">
+      <a href="/">🏠 Home</a>
+      <span class="separator">→</span>
+      <a href="/{{ database }}">{{ database|title }}</a>
+      <span class="separator">→</span>
+      <span>{{ table|title }}</span>
+    </div>
+
+    <h1>{{ table|title }}</h1>
+
+    <div class="table-actions">
+      <a href="/{{ database }}/{{ table }}.json" class="btn">📊 JSON</a>
+      <a href="/{{ database }}/{{ table }}.csv" class="btn">📈 CSV</a>
+      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">💻 SQL</a>
+    </div>
+  </div>
+{% endif %}
+
+{# Let Datasette handle the core functionality #}
+{{ super() }}
+
+{# Add appropriate tools section #}
+{% if row %}
+  {# Tools for single record #}
+  <section class="row-tools zeeker-custom">
+    <div class="card">
+      <h2>🛠️ Record Tools</h2>
+
+      <div class="tools-grid">
+        <div class="tool">
+          <h3>📊 Export Record</h3>
+          <p>Download this record in various formats</p>
+          <div class="export-options">
+            <a href="{{ request.url }}.json" class="btn">JSON</a>
+          </div>
+        </div>
+
+        <div class="tool">
+          <h3>🔍 Find Similar</h3>
+          <p>Search for similar records</p>
+          <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
+        </div>
+
+        <div class="tool">
+          <h3>💻 Query Builder</h3>
+          <p>Build custom queries</p>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">SQL Editor</a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% else %}
+  {# Tools for table listing #}
+  <section class="table-tools zeeker-custom">
+    <div class="card">
+      <h2>🛠️ Table Tools</h2>
+
+      <div class="tools-grid">
+        <div class="tool">
+          <h3>💻 Custom SQL</h3>
+          <p>Write custom queries against this table</p>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+" class="btn">Open SQL Editor</a>
+        </div>
+
+        <div class="tool">
+          <h3>📊 Export Data</h3>
+          <p>Download table data in various formats</p>
+          <div class="export-options">
+            <a href="/{{ database }}/{{ table }}.json?_shape=array" class="btn">JSON Array</a>
+            <a href="/{{ database }}/{{ table }}.csv" class="btn">CSV File</a>
+          </div>
+        </div>
+
+        <div class="tool">
+          <h3>🔗 API Access</h3>
+          <p>Programmatic access to this table</p>
+          <div class="api-examples">
+            <div class="api-example">
+              <label>REST API:</label>
+              <code>GET {{ request.url_root }}{{ database }}/{{ table }}.json</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="tool">
+          <h3>📈 Analysis</h3>
+          <p>Quick data analysis and statistics</p>
+          <a href="/{{ database }}?sql=SELECT+COUNT(*)+FROM+%22{{ table }}%22" class="btn">Basic Stats</a>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endif %}
+{% endblock %}
+</document_content>
+</document>
+<document index="18">
+<source>./templates/pages/about.html</source>
+<document_content>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Zeeker Legal Data Backbone</title>
+    <meta name="description" content="About Zeeker - Singapore's professional legal data backbone for research, analysis, and AI applications">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+    
+    <style>
+        .hero-section {
+            text-align: center;
+            padding: 4rem 0;
+            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+            border-radius: var(--border-radius-large);
+            margin-bottom: 4rem;
+        }
+        
+        .hero-section h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+        
+        .hero-tagline {
+            font-size: 1.3rem;
+            color: var(--color-text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .feature-card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 2rem;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-accent-magenta));
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(0, 212, 255, 0.15);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+        
+        .feature-title {
+            color: var(--color-accent-cyan);
+            margin-bottom: 1rem;
+        }
+        
+        .stats-section {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 3rem;
+            margin: 4rem 0;
+            text-align: center;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .stat-item {
+            padding: 1.5rem;
+            background: var(--color-bg-tertiary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-border);
+        }
+        
+        .stat-number {
+            font-family: var(--font-heading);
+            font-size: 2.5rem;
+            color: var(--color-accent-cyan);
+            display: block;
+            text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+        
+        .stat-label {
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        
+        .timeline {
+            margin: 4rem 0;
+        }
+        
+        .timeline-item {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 3rem;
+            align-items: flex-start;
+        }
+        
+        .timeline-date {
+            font-family: var(--font-heading);
+            color: var(--color-accent-cyan);
+            font-weight: 700;
+            min-width: 120px;
+            text-align: right;
+        }
+        
+        .timeline-content {
+            flex: 1;
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 1.5rem;
+            position: relative;
+        }
+        
+        .timeline-content::before {
+            content: '';
+            position: absolute;
+            left: -10px;
+            top: 20px;
+            width: 0;
+            height: 0;
+            border: 10px solid transparent;
+            border-right-color: var(--color-border);
+        }
+        
+        .timeline-content::after {
+            content: '';
+            position: absolute;
+            left: -8px;
+            top: 22px;
+            width: 0;
+            height: 0;
+            border: 8px solid transparent;
+            border-right-color: var(--color-bg-secondary);
+        }
+        
+        .team-section {
+            margin: 4rem 0;
+        }
+        
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .team-member {
+            text-align: center;
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+        
+        .team-member:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 212, 255, 0.1);
+        }
+        
+        .team-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+        
+        .team-name {
+            font-family: var(--font-heading);
+            color: var(--color-accent-cyan);
+            margin-bottom: 0.5rem;
+        }
+        
+        .team-role {
+            color: var(--color-text-secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .cta-section {
+            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 4rem;
+            text-align: center;
+            margin: 4rem 0;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        @media (max-width: 768px) {
+            .timeline-item {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            
+            .timeline-date {
+                text-align: left;
+                min-width: auto;
+            }
+            
+            .timeline-content::before,
+            .timeline-content::after {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body class="page-about">
+    <header>
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">
+                    <a href="/">ZEEKER</a>
+                </div>
+                <div class="tagline">The Legal Data Backbone</div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/-/metadata">API Info</a></li>
+                    <li><a href="/templates/pages/about" class="active">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="hero-section">
+            <h1>About Zeeker</h1>
+            <p class="hero-tagline">
+                Singapore's premier legal data backbone, empowering research, analysis, and AI innovation 
+                with comprehensive access to legal resources
+            </p>
+        </div>
+
+        <section class="mission-section">
+            <div class="card">
+                <h2>🎯 Our Mission</h2>
+                <p>
+                    Zeeker transforms how legal professionals, researchers, and technologists access and analyze 
+                    Singapore's legal data. We bridge the gap between traditional legal research and modern 
+                    data science, providing a robust, professional-grade platform for legal intelligence.
+                </p>
+                
+                <p>
+                    Built on the powerful Datasette framework, Zeeker offers immutable, reliable access to 
+                    comprehensive legal datasets including court decisions, parliamentary proceedings, 
+                    regulatory updates, and legal commentary - all through an intuitive, futuristic interface 
+                    designed for the modern legal professional.
+                </p>
+            </div>
+        </section>
+
+        <section class="features-section">
+            <h2>🚀 Platform Capabilities</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🏛️</span>
+                    <h3 class="feature-title">Comprehensive Legal Data</h3>
+                    <p>
+                        Access to Supreme Court decisions, High Court judgments, parliamentary debates, 
+                        regulatory documents, and legal news from trusted Singapore sources.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔒</span>
+                    <h3 class="feature-title">Immutable & Reliable</h3>
+                    <p>
+                        All data served in read-only mode ensuring consistency, integrity, and compliance 
+                        with professional standards for legal research.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🔍</span>
+                    <h3 class="feature-title">Advanced Search</h3>
+                    <p>
+                        Full-text search across all legal documents with sophisticated filtering, 
+                        faceted navigation, and intelligent query suggestions.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🛠️</span>
+                    <h3 class="feature-title">Developer-Friendly API</h3>
+                    <p>
+                        RESTful APIs with JSON and CSV exports, SQL query interface, and comprehensive 
+                        documentation for seamless integration.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">🤖</span>
+                    <h3 class="feature-title">AI-Ready Data</h3>
+                    <p>
+                        Structured, clean datasets perfect for machine learning, natural language processing, 
+                        and legal AI applications.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3 class="feature-title">Real-Time Updates</h3>
+                    <p>
+                        Automatic synchronization with source systems ensures you always have access 
+                        to the latest legal information and decisions.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="stats-section">
+            <h2>📊 Platform Statistics</h2>
+            <p>Powering legal research and innovation across Singapore</p>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <span class="stat-number">10K+</span>
+                    <div class="stat-label">Court Decisions</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">50K+</span>
+                    <div class="stat-label">Legal Documents</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">24/7</span>
+                    <div class="stat-label">API Availability</div>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">99.9%</span>
+                    <div class="stat-label">Uptime SLA</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="technology-section">
+            <div class="card">
+                <h2>🔧 Technology Stack</h2>
+                <p>
+                    Zeeker is built on cutting-edge, open-source technologies designed for reliability, 
+                    performance, and scalability:
+                </p>
+                
+                <div class="tech-grid">
+                    <div class="tech-item">
+                        <h4>🗄️ Datasette Core</h4>
+                        <p>
+                            Built on Simon Willison's Datasette - the premier platform for exploring 
+                            and publishing data with built-in API generation and SQL query interface.
+                        </p>
+                    </div>
+                    
+                    <div class="tech-item">
+                        <h4>📱 Responsive Design</h4>
+                        <p>
+                            Mobile-first, accessible interface that works seamlessly across devices 
+                            while maintaining professional aesthetics.
+                        </p>
+                    </div>
+                    
+                    <div class="tech-item">
+                        <h4>☁️ Cloud Infrastructure</h4>
+                        <p>
+                            Containerized deployment with automatic database synchronization from 
+                            secure cloud storage for reliability and scalability.
+                        </p>
+                    </div>
+                    
+                    <div class="tech-item">
+                        <h4>🔐 Security First</h4>
+                        <p>
+                            Read-only data access, secure API endpoints, and compliance with 
+                            professional data handling standards.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="timeline">
+            <h2>📅 Development Timeline</h2>
+            
+            <div class="timeline-item">
+                <div class="timeline-date">2025 Q1</div>
+                <div class="timeline-content">
+                    <h3>Platform Launch</h3>
+                    <p>
+                        Initial release of Zeeker with core legal databases, futuristic UI design, 
+                        and comprehensive API access for Singapore legal data.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-date">2024 Q4</div>
+                <div class="timeline-content">
+                    <h3>Beta Testing</h3>
+                    <p>
+                        Extensive testing with legal professionals, researchers, and developers 
+                        to refine the user experience and API functionality.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-date">2024 Q3</div>
+                <div class="timeline-content">
+                    <h3>Data Pipeline Development</h3>
+                    <p>
+                        Built automated systems for collecting, processing, and synchronizing 
+                        legal data from multiple Singapore government and judicial sources.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="timeline-item">
+                <div class="timeline-date">2024 Q2</div>
+                <div class="timeline-content">
+                    <h3>Project Inception</h3>
+                    <p>
+                        Identified the need for a comprehensive, professional-grade platform 
+                        for accessing Singapore legal data for research and AI applications.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="use-cases-section">
+            <div class="card">
+                <h2>💼 Use Cases</h2>
+                <p>Zeeker serves diverse stakeholders in Singapore's legal ecosystem:</p>
+                
+                <div class="use-case-grid">
+                    <div class="use-case">
+                        <h3>👨‍💼 Legal Professionals</h3>
+                        <ul>
+                            <li>Research case precedents and legal trends</li>
+                            <li>Track regulatory changes and updates</li>
+                            <li>Analyze judicial decision patterns</li>
+                            <li>Prepare legal briefs with comprehensive data</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="use-case">
+                        <h3>🔬 Academic Researchers</h3>
+                        <ul>
+                            <li>Conduct empirical legal studies</li>
+                            <li>Analyze legislative trends over time</li>
+                            <li>Study judicial behavior and decision-making</li>
+                            <li>Publish data-driven legal scholarship</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="use-case">
+                        <h3>💻 Technology Developers</h3>
+                        <ul>
+                            <li>Build legal tech applications and tools</li>
+                            <li>Train AI models on legal text data</li>
+                            <li>Develop legal analytics platforms</li>
+                            <li>Create compliance monitoring systems</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="use-case">
+                        <h3>🏢 Enterprise Users</h3>
+                        <ul>
+                            <li>Integrate legal data into business intelligence</li>
+                            <li>Monitor regulatory compliance requirements</li>
+                            <li>Automate legal risk assessment</li>
+                            <li>Support strategic decision-making</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta-section">
+            <h2>🚀 Get Started Today</h2>
+            <p>
+                Join Singapore's leading legal professionals, researchers, and developers who rely on 
+                Zeeker for comprehensive legal data access. Whether you're conducting research, 
+                building applications, or analyzing trends, Zeeker provides the tools you need.
+            </p>
+            
+            <div class="cta-buttons">
+                <a href="/" class="btn btn-primary">🏠 Explore Databases</a>
+                <a href="/-/metadata" class="btn btn-secondary">📊 View API Documentation</a>
+                <a href="/templates/pages/sources" class="btn btn-secondary">📋 Data Sources</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/-/metadata">API Documentation</a>
+                <a href="/templates/pages/about">About</a>
+                <a href="/templates/pages/sources">Data Sources</a>
+                <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">License (CC-BY-4.0)</a>
+            </div>
+            <div class="footer-text">
+                <p>&copy; 2025 Zeeker - Singapore Legal Data Backbone</p>
+                <p>Empowering legal innovation through professional data access</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="/static/js/zeeker-enhanced.js"></script>
+</body>
+</html>
+</document_content>
+</document>
+<document index="19">
+<source>./templates/pages/sources.html</source>
+<document_content>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Sources - Zeeker Legal Data Backbone</title>
+    <meta name="description" content="Data sources and attribution for Singapore legal information available through Zeeker">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+    
+    <style>
+        .hero-section {
+            text-align: center;
+            padding: 3rem 0;
+            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+            border-radius: var(--border-radius-large);
+            margin-bottom: 3rem;
+        }
+        
+        .hero-section h1 {
+            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+        
+        .source-category {
+            margin: 3rem 0;
+        }
+        
+        .category-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--color-accent-cyan);
+        }
+        
+        .category-icon {
+            font-size: 2rem;
+        }
+        
+        .category-title {
+            font-family: var(--font-heading);
+            color: var(--color-accent-cyan);
+            margin: 0;
+        }
+        
+        .category-description {
+            color: var(--color-text-secondary);
+            margin: 0;
+            font-size: 0.95rem;
+        }
+        
+        .source-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .source-card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 1.5rem;
+            transition: var(--transition);
+            position: relative;
+        }
+        
+        .source-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--color-border-hover);
+            box-shadow: 0 8px 24px rgba(0, 212, 255, 0.1);
+        }
+        
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        
+        .source-name {
+            font-family: var(--font-heading);
+            color: var(--color-text-primary);
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+        }
+        
+        .source-url {
+            font-size: 0.8rem;
+            color: var(--color-accent-cyan);
+            word-break: break-all;
+        }
+        
+        .source-status {
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        
+        .status-active {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        
+        .status-maintenance {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+        
+        .status-deprecated {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .source-description {
+            color: var(--color-text-secondary);
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+        
+        .source-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--color-bg-primary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-border);
+        }
+        
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .meta-label {
+            font-size: 0.8rem;
+            color: var(--color-text-muted);
+            margin-bottom: 0.2rem;
+        }
+        
+        .meta-value {
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+        
+        .source-tables {
+            margin-top: 1rem;
+        }
+        
+        .source-tables h4 {
+            color: var(--color-accent-cyan);
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .table-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .table-tag {
+            padding: 0.2rem 0.6rem;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--color-accent-cyan);
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: var(--color-accent-cyan);
+        }
+        
+        .license-section {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 2rem;
+            margin: 4rem 0;
+        }
+        
+        .license-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .license-item {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+        }
+        
+        .license-name {
+            font-family: var(--font-heading);
+            color: var(--color-accent-cyan);
+            margin-bottom: 0.5rem;
+        }
+        
+        .update-schedule {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--color-bg-tertiary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-border);
+        }
+        
+        .schedule-source {
+            font-weight: 500;
+        }
+        
+        .schedule-frequency {
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .contact-section {
+            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 3rem;
+            text-align: center;
+            margin: 4rem 0;
+        }
+        
+        .contact-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body class="page-sources">
+    <header>
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">
+                    <a href="/">ZEEKER</a>
+                </div>
+                <div class="tagline">The Legal Data Backbone</div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/-/metadata">API Info</a></li>
+                    <li><a href="/templates/pages/about">About</a></li>
+                    <li><a href="/templates/pages/sources" class="active">Sources</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="hero-section">
+            <h1>📋 Data Sources</h1>
+            <p>
+                Comprehensive attribution and information about the legal data sources 
+                powering Zeeker's Singapore legal database
+            </p>
+        </div>
+
+        <section class="intro-section">
+            <div class="card">
+                <h2>🔍 Data Collection Philosophy</h2>
+                <p>
+                    Zeeker aggregates legal information from authoritative Singapore government and judicial sources, 
+                    ensuring accuracy, completeness, and legal compliance. All data is collected through automated 
+                    processes that respect robots.txt guidelines and terms of service.
+                </p>
+                
+                <p>
+                    We maintain strict data integrity standards and provide full attribution to original sources. 
+                    Our platform serves as an access layer that enhances discoverability while respecting 
+                    the intellectual property and licensing requirements of data providers.
+                </p>
+            </div>
+        </section>
+
+        <section class="source-category">
+            <div class="category-header">
+                <span class="category-icon">🏛️</span>
+                <div>
+                    <h2 class="category-title">Supreme Court & Judicial Sources</h2>
+                    <p class="category-description">Court decisions, judgments, and legal precedents from Singapore's judicial system</p>
+                </div>
+            </div>
+            
+            <div class="source-grid">
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">Singapore Courts</h3>
+                            <a href="https://www.judiciary.gov.sg" class="source-url" target="_blank">judiciary.gov.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Official repository of court decisions from the Supreme Court, High Court, and subordinate courts. 
+                        Includes judgments, grounds of decision, and case summaries.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Daily</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">2000 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-28</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~12,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">supreme_court_decisions</span>
+                            <span class="table-tag">high_court_judgments</span>
+                            <span class="table-tag">case_summaries</span>
+                            <span class="table-tag">judicial_precedents</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">LawNet</h3>
+                            <a href="https://www.lawnet.sg" class="source-url" target="_blank">lawnet.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Comprehensive legal database maintained by the Singapore Academy of Law, 
+                        containing unreported judgments and legal commentary.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Weekly</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">1995 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-25</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~8,200</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">unreported_judgments</span>
+                            <span class="table-tag">legal_commentary</span>
+                            <span class="table-tag">case_analysis</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="source-category">
+            <div class="category-header">
+                <span class="category-icon">🏛️</span>
+                <div>
+                    <h2 class="category-title">Parliamentary & Legislative Sources</h2>
+                    <p class="category-description">Parliamentary proceedings, legislation, and regulatory documents</p>
+                </div>
+            </div>
+            
+            <div class="source-grid">
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">Parliament of Singapore</h3>
+                            <a href="https://www.parliament.gov.sg" class="source-url" target="_blank">parliament.gov.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Official parliamentary proceedings including debates, bills, motions, and committee reports 
+                        from Singapore's Parliament.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Session-based</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">1965 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-27</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~25,000</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">parliamentary_debates</span>
+                            <span class="table-tag">bills_and_acts</span>
+                            <span class="table-tag">committee_reports</span>
+                            <span class="table-tag">ministerial_statements</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">Singapore Statutes Online</h3>
+                            <a href="https://sso.agc.gov.sg" class="source-url" target="_blank">sso.agc.gov.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Authoritative source for Singapore's legislation including Acts, subsidiary legislation, 
+                        and consolidated statutes maintained by the Attorney-General's Chambers.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">As enacted</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">1965 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-28</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~1,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">acts_and_statutes</span>
+                            <span class="table-tag">subsidiary_legislation</span>
+                            <span class="table-tag">consolidated_versions</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="source-category">
+            <div class="category-header">
+                <span class="category-icon">📰</span>
+                <div>
+                    <h2 class="category-title">Legal News & Commentary</h2>
+                    <p class="category-description">Legal news, analysis, and professional commentary on Singapore law</p>
+                </div>
+            </div>
+            
+            <div class="source-grid">
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">SG Law Watch</h3>
+                            <a href="https://sglawwatch.sg" class="source-url" target="_blank">sglawwatch.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Professional legal news and analysis covering Singapore's legal developments, 
+                        case commentary, and legislative updates.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Daily</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">2020 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-28</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~3,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">legal_news</span>
+                            <span class="table-tag">case_commentary</span>
+                            <span class="table-tag">legal_analysis</span>
+                            <span class="table-tag">industry_updates</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="license-section">
+            <h2>📄 Licensing & Attribution</h2>
+            <p>
+                Zeeker respects the intellectual property rights of all data providers and operates under 
+                appropriate licensing frameworks:
+            </p>
+            
+            <div class="license-grid">
+                <div class="license-item">
+                    <h3 class="license-name">Government Sources</h3>
+                    <p>
+                        Data from government websites is typically available under the 
+                        Singapore Open Data License, allowing for reuse with proper attribution.
+                    </p>
+                </div>
+                
+                <div class="license-item">
+                    <h3 class="license-name">Judicial Decisions</h3>
+                    <p>
+                        Court judgments and decisions are in the public domain and freely accessible 
+                        for research and analysis purposes.
+                    </p>
+                </div>
+                
+                <div class="license-item">
+                    <h3 class="license-name">Parliamentary Proceedings</h3>
+                    <p>
+                        Parliamentary debates and official proceedings are public records 
+                        available for research and educational use.
+                    </p>
+                </div>
+                
+                <div class="license-item">
+                    <h3 class="license-name">Zeeker Platform</h3>
+                    <p>
+                        Our aggregated database and platform interface are provided under 
+                        Creative Commons Attribution 4.0 (CC-BY-4.0) license.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="update-schedule">
+            <h2>⏱️ Update Schedule</h2>
+            <p>
+                Different data sources have varying update frequencies based on their nature and availability:
+            </p>
+            
+            <div class="schedule-grid">
+                <div class="schedule-item">
+                    <span class="schedule-source">Court Decisions</span>
+                    <span class="schedule-frequency">Daily</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Parliamentary Debates</span>
+                    <span class="schedule-frequency">Session-based</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Legal News</span>
+                    <span class="schedule-frequency">Daily</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Legislation</span>
+                    <span class="schedule-frequency">As enacted</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Platform Sync</span>
+                    <span class="schedule-frequency">Hourly</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Database Rebuild</span>
+                    <span class="schedule-frequency">Daily</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="quality-section">
+            <div class="card">
+                <h2>✅ Data Quality & Validation</h2>
+                <p>
+                    Zeeker implements comprehensive data quality measures to ensure accuracy and reliability:
+                </p>
+                
+                <div class="quality-measures">
+                    <div class="quality-item">
+                        <h3>🔍 Source Verification</h3>
+                        <p>All data sources are verified against official government and judicial websites</p>
+                    </div>
+                    
+                    <div class="quality-item">
+                        <h3>🔄 Consistency Checks</h3>
+                        <p>Automated validation ensures data consistency and identifies anomalies</p>
+                    </div>
+                    
+                    <div class="quality-item">
+                        <h3>📅 Freshness Monitoring</h3>
+                        <p>Active monitoring of source updates with alerts for stale or missing data</p>
+                    </div>
+                    
+                    <div class="quality-item">
+                        <h3>🏷️ Metadata Enrichment</h3>
+                        <p>Enhanced metadata and classification for improved searchability</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="contact-section">
+            <h2>📞 Data Source Inquiries</h2>
+            <p>
+                Questions about data sources, licensing, or access? We're here to help with 
+                any inquiries about the legal data available through Zeeker.
+            </p>
+            
+            <div class="contact-buttons">
+                <a href="mailto:data@zeeker.sg" class="btn btn-primary">📧 Contact Data Team</a>
+                <a href="/-/metadata" class="btn btn-secondary">📊 Technical Documentation</a>
+                <a href="/templates/pages/about" class="btn btn-secondary">ℹ️ Learn More</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/-/metadata">API Documentation</a>
+                <a href="/templates/pages/about">About</a>
+                <a href="/templates/pages/sources">Data Sources</a>
+                <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">License (CC-BY-4.0)</a>
+            </div>
+            <div class="footer-text">
+                <p>&copy; 2025 Zeeker - Singapore Legal Data Backbone</p>
+                <p>Comprehensive legal data with full source attribution and compliance</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="/static/js/zeeker-enhanced.js"></script>
+</body>
+</html>
+</document_content>
+</document>
+<document index="20">
+<source>./static/js/zeeker-enhanced.js</source>
+<document_content>
+/**
+ * Zeeker Enhanced JavaScript - Safe Version
+ * Only adds enhancements without interfering with table visibility
+ */
+
+class ZeekerEnhancer {
+  constructor() {
+    this.init();
+  }
+
+  init() {
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('Zeeker Enhanced: Initializing...');
+      this.addBodyClasses();
+      this.enhanceSearch();
+      this.addCopyButtons();
+      this.enhanceExportLinks();
+      this.addKeyboardShortcuts();
+      // REMOVED: this.addTableEnhancements(); - This was hiding tables
+      console.log('Zeeker Enhanced: Initialization complete');
+    });
+  }
+
+  addBodyClasses() {
+    document.body.classList.add('zeeker-enhanced');
+
+    // Add specific page classes for enhanced styling
+    const path = window.location.pathname;
+    if (path === '/') {
+      document.body.classList.add('page-home');
+    } else if (path.includes('/query')) {
+      document.body.classList.add('page-query');
+    } else if (path.match(/\/[^/]+\/[^/]+$/)) {
+      document.body.classList.add('page-table');
+    } else if (path.match(/\/[^/]+$/)) {
+      document.body.classList.add('page-database');
+    }
+  }
+
+  enhanceSearch() {
+    const searchInputs = document.querySelectorAll('input[type="search"], input[name="q"]');
+
+    searchInputs.forEach(input => {
+      // Add keyboard shortcuts
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          input.blur();
+        }
+        if (e.key === 'Enter' && e.ctrlKey) {
+          // Ctrl+Enter for quick search
+          input.form?.submit();
+        }
+      });
+    });
+  }
+
+  addCopyButtons() {
+    // Add copy buttons to code blocks only (not tables)
+    const codeElements = document.querySelectorAll('pre code, .highlight');
+
+    codeElements.forEach(element => {
+      if (element.closest('.copy-button-added')) return;
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'code-wrapper copy-button-added';
+      wrapper.style.position = 'relative';
+
+      element.parentNode.insertBefore(wrapper, element);
+      wrapper.appendChild(element);
+
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-btn';
+      copyButton.innerHTML = '📋 Copy';
+      copyButton.style.cssText = `
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: var(--color-accent-primary);
+        color: white;
+        border: none;
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        z-index: 10;
+      `;
+
+      copyButton.addEventListener('click', () => {
+        const text = element.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          copyButton.innerHTML = '✅ Copied!';
+          setTimeout(() => {
+            copyButton.innerHTML = '📋 Copy';
+          }, 2000);
+        });
+      });
+
+      wrapper.appendChild(copyButton);
+    });
+  }
+
+  enhanceExportLinks() {
+    const exportLinks = document.querySelectorAll('.export-links a, a[href$=".csv"], a[href$=".json"]');
+
+    exportLinks.forEach(link => {
+      link.addEventListener('click', (e) => {
+        // Add loading state
+        const originalText = link.textContent;
+        link.textContent = '⬇️ Downloading...';
+        link.style.pointerEvents = 'none';
+
+        setTimeout(() => {
+          link.textContent = originalText;
+          link.style.pointerEvents = 'auto';
+        }, 2000);
+      });
+    });
+  }
+
+  addKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Only activate shortcuts when not in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      switch (e.key) {
+        case '/':
+          e.preventDefault();
+          const searchInput = document.querySelector('input[name="q"]');
+          if (searchInput) {
+            searchInput.focus();
+          }
+          break;
+
+        case 'h':
+          if (e.ctrlKey) {
+            e.preventDefault();
+            window.location.href = '/';
+          }
+          break;
+
+        case 'b':
+          if (e.ctrlKey) {
+            e.preventDefault();
+            window.history.back();
+          }
+          break;
+      }
+    });
+  }
+}
+
+// Initialize the enhancer
+new ZeekerEnhancer();
+
+class ZeekerFullViewportHero {
+  constructor() {
+    this.init();
+  }
+
+  init() {
+    document.addEventListener('DOMContentLoaded', () => {
+      this.setupHeroEnhancements();
+      this.addScrollIndicator();
+      this.handleViewportResize();
+      this.optimizeImageLoading();
+      this.addKeyboardNavigation();
+    });
+  }
+
+  setupHeroEnhancements() {
+    // Add body classes for styling coordination
+    const heroElement = document.querySelector('.hero-fullscreen, .hero-split-viewport, .hero-immersive-full');
+
+    if (heroElement) {
+      if (heroElement.classList.contains('hero-fullscreen')) {
+        document.body.classList.add('hero-fullscreen-active');
+      } else if (heroElement.classList.contains('hero-split-viewport')) {
+        document.body.classList.add('hero-split-active');
+      } else if (heroElement.classList.contains('hero-immersive-full')) {
+        document.body.classList.add('hero-immersive-active');
+      }
+    }
+
+    // Enhanced search form functionality
+    const heroSearchForm = document.querySelector('.search-form-hero');
+    if (heroSearchForm) {
+      this.enhanceHeroSearch(heroSearchForm);
+    }
+
+    // Add parallax scrolling for immersive hero
+    if (document.querySelector('.hero-immersive-full')) {
+      this.addParallaxScrolling();
+    }
+  }
+
+  enhanceHeroSearch(form) {
+    const input = form.querySelector('input');
+
+    // Add auto-complete suggestions
+    this.addSearchAutoComplete(input);
+
+    // Add search animation
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      this.animateSearch(input);
+
+      // Simulate search - replace with actual search logic
+      setTimeout(() => {
+        if (input.value.trim()) {
+          window.location.href = `/-/search?q=${encodeURIComponent(input.value)}`;
+        }
+      }, 500);
+    });
+
+    // Add keyboard shortcuts
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        input.blur();
+        input.value = '';
+      }
+    });
+  }
+
+  addSearchAutoComplete(input) {
+    const suggestions = [
+      'court decisions',
+      'supreme court',
+      'high court',
+      'parliamentary debates',
+      'legal regulations',
+      'case law',
+      'statutory instruments',
+      'legal precedents',
+      'contract law',
+      'criminal law',
+      'civil procedure'
+    ];
+
+    let suggestionContainer = null;
+
+    input.addEventListener('input', () => {
+      this.showSearchSuggestions(input, suggestions);
+    });
+
+    input.addEventListener('blur', () => {
+      setTimeout(() => this.hideSearchSuggestions(), 200);
+    });
+  }
+
+  showSearchSuggestions(input, suggestions) {
+    const query = input.value.toLowerCase().trim();
+
+    if (query.length < 2) {
+      this.hideSearchSuggestions();
+      return;
+    }
+
+    const matches = suggestions.filter(s =>
+      s.toLowerCase().includes(query)
+    ).slice(0, 5);
+
+    if (matches.length === 0) {
+      this.hideSearchSuggestions();
+      return;
+    }
+
+    let container = document.getElementById('hero-search-suggestions');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'hero-search-suggestions';
+      container.className = 'hero-search-suggestions';
+      input.parentNode.appendChild(container);
+    }
+
+    container.innerHTML = matches.map(match =>
+      `<div class="suggestion-item" data-value="${match}">
+        <span class="suggestion-icon">🔍</span>
+        <span class="suggestion-text">${match}</span>
+      </div>`
+    ).join('');
+
+    container.style.display = 'block';
+
+    // Add click handlers
+    container.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', () => {
+        input.value = item.dataset.value;
+        this.hideSearchSuggestions();
+        input.form.dispatchEvent(new Event('submit'));
+      });
+    });
+
+    this.addSuggestionStyles();
+  }
+
+  hideSearchSuggestions() {
+    const container = document.getElementById('hero-search-suggestions');
+    if (container) {
+      container.style.display = 'none';
+    }
+  }
+
+  addSuggestionStyles() {
+    if (document.getElementById('hero-search-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'hero-search-styles';
+    style.textContent = `
+      .hero-search-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: rgba(17, 17, 17, 0.95);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        border-top: none;
+        border-radius: 0 0 25px 25px;
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      }
+
+      .suggestion-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .suggestion-item:hover {
+        background: rgba(0, 212, 255, 0.1);
+        color: var(--color-accent-cyan);
+      }
+
+      .suggestion-item:last-child {
+        border-bottom: none;
+      }
+
+      .suggestion-icon {
+        opacity: 0.7;
+      }
+
+      .suggestion-text {
+        flex: 1;
+        color: var(--color-text-secondary);
+      }
+
+      .suggestion-item:hover .suggestion-text {
+        color: var(--color-text-primary);
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  animateSearch(input) {
+    input.style.transform = 'scale(0.98)';
+    input.style.opacity = '0.8';
+
+    setTimeout(() => {
+      input.style.transform = 'scale(1)';
+      input.style.opacity = '1';
+    }, 200);
+  }
+
+  addScrollIndicator() {
+    const heroElement = document.querySelector('.hero-fullscreen, .hero-split-viewport, .hero-immersive-full');
+    if (!heroElement) return;
+
+    const indicator = document.createElement('div');
+    indicator.className = 'scroll-indicator';
+    indicator.innerHTML = `
+      <div class="scroll-arrow">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 13l3 3 7-7"></path>
+          <path d="M7 6l3 3 7-7"></path>
+        </svg>
+      </div>
+      <span>Scroll to explore</span>
+    `;
+
+    heroElement.appendChild(indicator);
+    this.addScrollIndicatorStyles();
+
+    // Hide indicator on scroll
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const scrolled = window.pageYOffset > 100;
+          indicator.style.opacity = scrolled ? '0' : '1';
+          indicator.style.transform = scrolled ? 'translateY(20px)' : 'translateY(0)';
+          ticking = false;
+        });
+        ticking = true;
+      }
+    });
+  }
+
+  addScrollIndicatorStyles() {
+    if (document.getElementById('scroll-indicator-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'scroll-indicator-styles';
+    style.textContent = `
+      .scroll-indicator {
+        position: absolute;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--color-text-muted);
+        font-size: 0.9rem;
+        opacity: 0.8;
+        transition: all 0.3s ease;
+        animation: bounce 2s infinite;
+      }
+
+      .scroll-arrow {
+        transform: rotate(90deg);
+        opacity: 0.7;
+      }
+
+      @keyframes bounce {
+        0%, 20%, 50%, 80%, 100% {
+          transform: translateX(-50%) translateY(0);
+        }
+        40% {
+          transform: translateX(-50%) translateY(-10px);
+        }
+        60% {
+          transform: translateX(-50%) translateY(-5px);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .scroll-indicator {
+          bottom: 1rem;
+          font-size: 0.8rem;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  addParallaxScrolling() {
+    const parallaxElement = document.querySelector('.hero-immersive-bg');
+    if (!parallaxElement) return;
+
+    let ticking = false;
+
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const scrolled = window.pageYOffset;
+          const rate = scrolled * -0.5;
+          parallaxElement.style.transform = `translate3d(0, ${rate}px, 0)`;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    });
+  }
+
+  handleViewportResize() {
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        this.updateViewportHeight();
+      }, 250);
+    });
+  }
+
+  updateViewportHeight() {
+    const heroElements = document.querySelectorAll('.hero-fullscreen, .hero-split-viewport, .hero-immersive-full');
+    heroElements.forEach(hero => {
+      hero.style.height = `${window.innerHeight}px`;
+    });
+  }
+
+  optimizeImageLoading() {
+    // Preload the hero image
+    const img = new Image();
+    img.src = '/static/images/holographic-building.png';
+
+    // Add intersection observer for lazy loading optimization
+    if ('IntersectionObserver' in window) {
+      const heroImages = document.querySelectorAll('.hero-building-image');
+      const imageObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('loaded');
+            imageObserver.unobserve(entry.target);
+          }
+        });
+      });
+
+      heroImages.forEach(img => imageObserver.observe(img));
+    }
+  }
+
+  addKeyboardNavigation() {
+    document.addEventListener('keydown', (e) => {
+      // Skip if user is typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      switch (e.key) {
+        case '/':
+          e.preventDefault();
+          const searchInput = document.querySelector('.search-form-hero input');
+          if (searchInput) {
+            searchInput.focus();
+          }
+          break;
+
+        case 'Escape':
+          const activeInput = document.activeElement;
+          if (activeInput.tagName === 'INPUT') {
+            activeInput.blur();
+          }
+          this.hideSearchSuggestions();
+          break;
+      }
+    });
+  }
+}
+
+// Initialize the full viewport hero enhancement
+new ZeekerFullViewportHero();
+
+// Debug helper - shows when tables are being manipulated
+const originalHide = Element.prototype.style.setProperty;
+Element.prototype.style.setProperty = function(property, value, priority) {
+  if ((property === 'display' && value === 'none') ||
+      (property === 'visibility' && value === 'hidden') ||
+      (property === 'opacity' && value === '0')) {
+    if (this.tagName === 'TR' || this.tagName === 'TABLE' || this.closest('table')) {
+      console.warn('WARNING: Something is trying to hide table element:', this, property, value);
+      console.trace(); // This will show what's calling it
+      return; // Prevent hiding table elements
+    }
+  }
+  return originalHide.call(this, property, value, priority);
+};
+</document_content>
+</document>
+<document index="21">
+<source>./static/css/zeeker-theme.css</source>
+<document_content>
+/* Zeeker Datasette - Fixed Table Visibility */
+
+:root {
+  /* Professional Color Palette */
+  --color-bg-primary: #1a1a1a;
+  --color-bg-secondary: #2a2a2a;
+  --color-bg-tertiary: #3a3a3a;
+  --color-bg-elevated: #404040;
+
+  /* Professional Blue Accent System */
+  --color-accent-primary: #4A90E2;
+  --color-accent-hover: #357ABD;
+  --color-accent-light: #6BA3E8;
+  --color-accent-subtle: rgba(74, 144, 226, 0.15);
+
+  /* Text Colors */
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #E0E0E0;
+  --color-text-muted: #B0B0B0;
+  --color-text-inverse: #FFFFFF;
+
+  /* Borders */
+  --color-border: #404040;
+  --color-border-hover: #606060;
+  --color-border-focus: var(--color-accent-primary);
+
+  /* Typography */
+  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+
+  /* Layout */
+  --border-radius: 8px;
+  --border-radius-large: 12px;
+  --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --transition: all 0.2s ease;
+}
+
+/* CRITICAL: Force base styles */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg-primary) !important;
+}
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-bg-primary) !important;
+  color: var(--color-text-secondary) !important;
+  font-family: var(--font-body) !important;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
 }
 
-header {
-  background-color: #0366d6;
-  color: white;
-}
-
-.metadata-description {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 1em;
-  line-height: 1.5;
-}
-
+/* CRITICAL: Table Visibility Fixes */
+table,
+.rows-and-columns,
 table.rows-and-columns {
-  width: 100%;
-  border-collapse: collapse;
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1rem 0 !important;
 }
 
+/* Table Headers - MUST BE VISIBLE */
+table th,
+.rows-and-columns th,
 table.rows-and-columns th {
-  background-color: #f1f8ff;
-  border-bottom: 2px solid #0366d6;
+  background: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+  padding: 0.75rem 1rem !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  border: 1px solid var(--color-border) !important;
+  border-bottom: 2px solid var(--color-border-hover) !important;
+  font-size: 0.9rem !important;
 }
 
+/* Table Cells - CRITICAL VISIBILITY FIX */
+table td,
+.rows-and-columns td,
 table.rows-and-columns td {
-  border-bottom: 1px solid #e1e4e8;
-  padding: 0.5em;
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-secondary) !important;
+  padding: 0.75rem 1rem !important;
+  border: 1px solid var(--color-border) !important;
+  font-size: 0.9rem !important;
+  vertical-align: top !important;
+  line-height: 1.4 !important;
+  word-wrap: break-word !important;
 }
 
+/* Table Rows - HOVER EFFECTS */
+table tr,
+.rows-and-columns tr,
+table.rows-and-columns tr {
+  background: var(--color-bg-secondary) !important;
+}
+
+table tr:hover,
+.rows-and-columns tr:hover,
+table.rows-and-columns tr:hover {
+  background: var(--color-bg-tertiary) !important;
+}
+
+table tr:hover td,
+.rows-and-columns tr:hover td,
+table.rows-and-columns tr:hover td {
+  background: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Table Links */
+table a,
+.rows-and-columns a,
+table.rows-and-columns a {
+  color: var(--color-accent-primary) !important;
+  text-decoration: none !important;
+}
+
+table a:hover,
+.rows-and-columns a:hover,
+table.rows-and-columns a:hover {
+  color: var(--color-accent-light) !important;
+  text-decoration: underline !important;
+}
+
+/* Table Container */
 .table-wrapper {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius-large) !important;
+  overflow: auto !important;
+  margin: 1rem 0 !important;
+  box-shadow: var(--shadow-subtle) !important;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading) !important;
+  color: var(--color-text-primary) !important;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 1rem 0;
+}
+
+h1 { font-size: 2.5rem; }
+h2 { font-size: 2rem; }
+h3 { font-size: 1.5rem; }
+
+p {
+  color: var(--color-text-secondary) !important;
+  margin-bottom: 1rem;
+}
+
+/* Links */
+a {
+  color: var(--color-accent-primary) !important;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+a:hover {
+  color: var(--color-accent-light) !important;
+}
+
+/* Header */
+header {
+  background: var(--color-bg-secondary) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  font-family: var(--font-heading) !important;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-primary) !important;
+}
+
+.logo a {
+  color: var(--color-text-primary) !important;
+  text-decoration: none;
+}
+
+.tagline {
+  font-size: 0.9rem;
+  color: var(--color-text-muted) !important;
+  margin-left: 1rem;
+}
+
+/* Navigation */
+nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+nav a {
+  display: block;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary) !important;
+  font-weight: 500;
+  transition: var(--transition);
+}
+
+nav a:hover {
+  background: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Main Content */
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: calc(100vh - 200px);
+}
+
+/* Forms and Inputs */
+input, textarea, select {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius);
+  color: var(--color-text-primary) !important;
+  padding: 0.75rem;
+  outline: none;
+  transition: var(--transition);
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--color-accent-primary) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-subtle) !important;
+}
+
+input::placeholder {
+  color: var(--color-text-muted) !important;
+}
+
+/* Buttons */
+.btn, button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-secondary) !important;
+  font-family: var(--font-body);
+  font-weight: 500;
+  text-decoration: none;
+  transition: var(--transition);
+  cursor: pointer;
+}
+
+.btn:hover, button:hover {
+  background: var(--color-bg-tertiary) !important;
+  border-color: var(--color-border-hover);
+  color: var(--color-text-primary) !important;
+}
+
+.btn-primary {
+  background: var(--color-accent-primary) !important;
+  border-color: var(--color-accent-primary) !important;
+  color: var(--color-text-inverse) !important;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover) !important;
+  border-color: var(--color-accent-hover) !important;
+}
+
+/* Cards */
+.card {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius-large);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  transition: var(--transition);
+}
+
+.card:hover {
+  border-color: var(--color-border-hover) !important;
+  box-shadow: var(--shadow-medium);
+}
+
+.card h2, .card h3 {
+  color: var(--color-text-primary) !important;
+  margin-top: 0;
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+.breadcrumbs a {
+  color: var(--color-text-muted) !important;
+}
+
+.breadcrumbs a:hover {
+  color: var(--color-accent-primary) !important;
+}
+
+.separator {
+  color: var(--color-text-muted) !important;
+}
+
+/* Custom Zeeker Sections */
+.zeeker-custom {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius-large);
+  padding: 2rem;
+  margin: 2rem 0;
+}
+
+.table-header {
+  margin-bottom: 2rem;
+}
+
+.table-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.tool {
+  background: var(--color-bg-tertiary) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+}
+
+.tool h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: var(--color-accent-primary) !important;
+}
+
+/* Search form styling */
+.search-form input {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Code blocks */
+pre, code {
+  background: var(--color-bg-tertiary) !important;
+  color: var(--color-accent-light) !important;
+  border-radius: var(--border-radius);
+  font-family: var(--font-mono);
+}
+
+pre {
+  padding: 1rem;
   overflow-x: auto;
 }
 
-.home-info {
-  margin: 2em 0;
-  padding: 1em;
-  background-color: #f6f8fa;
-  border: 1px solid #e1e4e8;
-  border-radius: 6px;
+code {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9em;
 }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.pagination a {
+  background: var(--color-bg-secondary) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+  padding: 0.5rem 1rem;
+  border-radius: var(--border-radius);
+  transition: var(--transition);
+}
+
+.pagination a:hover {
+  background: var(--color-bg-tertiary) !important;
+  color: var(--color-text-primary) !important;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .tagline {
+    margin-left: 0 !important;
+  }
+
+  nav ul {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  main {
+    padding: 1rem;
+  }
+
+  .table-actions {
+    justify-content: center;
+  }
+
+  .tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Mobile table scrolling */
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 600px;
+  }
+}
+
+/* EMERGENCY VISIBILITY FIXES */
+/* If nothing else works, these should force visibility */
+tbody tr {
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-secondary) !important;
+}
+
+tbody td {
+  background: var(--color-bg-secondary) !important;
+  color: var(--color-text-secondary) !important;
+  padding: 0.75rem !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+/* Force any hidden elements to be visible */
+table[style*="display: none"],
+tr[style*="display: none"],
+td[style*="display: none"] {
+  display: table !important;
+}
+
+table tr[style*="visibility: hidden"],
+td[style*="visibility: hidden"] {
+  visibility: visible !important;
+}
+
+/* Override any opacity issues */
+table tr[style*="opacity: 0"],
+td[style*="opacity: 0"] {
+  opacity: 1 !important;
+}
+
+/* Final fallback - make EVERYTHING visible */
+table * {
+  color: var(--color-text-secondary) !important;
+  background: inherit !important;
+}
+
+/* Row/Record Page Styling */
+.row-header {
+  margin-bottom: 2rem;
+}
+
+.record-title {
+  font-size: 1.2rem;
+  color: var(--color-text-primary) !important;
+  background: var(--color-bg-tertiary);
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  margin: 1rem 0;
+  border-left: 4px solid var(--color-accent-primary);
+  font-weight: 500;
+}
+
+.row-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.row-tools {
+  margin-top: 2rem;
+}
+
+/* Distinguish between table and row pages */
+.page-table .table-header {
+  border-left: 4px solid var(--color-accent-primary);
+}
+
+.page-row .row-header {
+  border-left: 4px solid var(--color-accent-light);
+}
+
+/* Better styling for record data display */
+.row dt {
+  color: var(--color-text-primary) !important;
+  font-weight: 600;
+  background: var(--color-bg-tertiary);
+  padding: 0.5rem 1rem;
+  margin: 0;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
+}
+
+.row dd {
+  color: var(--color-text-secondary) !important;
+  background: var(--color-bg-secondary);
+  padding: 1rem;
+  margin: 0 0 1rem 0;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  border: 1px solid var(--color-border);
+  border-top: none;
+}
+
+/* Style the definition list for better readability */
+.row dl {
+  margin: 1rem 0;
+}
+
+/* Long text content in records */
+.row dd.long {
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+/* JSON/code content in records */
+.row dd pre {
+  background: var(--color-bg-primary) !important;
+  color: var(--color-accent-light) !important;
+  padding: 1rem;
+  border-radius: var(--border-radius);
+  overflow-x: auto;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Links in record data */
+.row dd a {
+  color: var(--color-accent-primary) !important;
+  word-break: break-all;
+}
+
+.row dd a:hover {
+  color: var(--color-accent-light) !important;
+  text-decoration: underline;
+}
+
+/* Responsive adjustments for record pages */
+@media (max-width: 768px) {
+  .row-actions {
+    justify-content: center;
+  }
+
+  .record-title {
+    font-size: 1rem;
+    padding: 0.75rem;
+  }
+
+  .row dd {
+    padding: 0.75rem;
+  }
+}
+
+/* Option 1: Full Viewport Background */
+.hero-fullscreen {
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  background: linear-gradient(135deg,
+    var(--color-bg-primary),
+    var(--color-bg-secondary)
+  );
+}
+
+.hero-background-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/static/images/holographic-building.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.25;
+  z-index: 1;
+  animation: heroBackgroundFloat 15s ease-in-out infinite;
+  filter: hue-rotate(180deg) brightness(1.2) contrast(1.1);
+}
+
+@keyframes heroBackgroundFloat {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-20px) scale(1.02);
+  }
+}
+
+.hero-content-overlay {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  max-width: 900px;
+  padding: 4rem 2rem;
+}
+
+.hero-content-overlay h1 {
+  font-size: clamp(3rem, 6vw, 5rem);
+  font-weight: 900;
+  margin-bottom: 2rem;
+  color: var(--color-text-primary);
+  text-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
+  letter-spacing: -0.02em;
+}
+
 </document_content>
 </document>
 </documents>

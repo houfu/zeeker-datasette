@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Sources - Zeeker Legal Data Backbone</title>
+    <meta name="description" content="Data sources and attribution for Singapore legal information available through Zeeker">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+    
+    <style>
+        .hero-section {
+            text-align: center;
+            padding: 3rem 0;
+            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+            border-radius: var(--border-radius-large);
+            margin-bottom: 3rem;
+        }
+        
+        .hero-section h1 {
+            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+        
+        .source-category {
+            margin: 3rem 0;
+        }
+        
+        .category-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--color-accent-cyan);
+        }
+        
+        .category-icon {
+            font-size: 2rem;
+        }
+        
+        .category-title {
+            font-family: var(--font-heading);
+            color: var(--color-accent-cyan);
+            margin: 0;
+        }
+        
+        .category-description {
+            color: var(--color-text-secondary);
+            margin: 0;
+            font-size: 0.95rem;
+        }
+        
+        .source-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        .source-card {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 1.5rem;
+            transition: var(--transition);
+            position: relative;
+        }
+        
+        .source-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--color-border-hover);
+            box-shadow: 0 8px 24px rgba(0, 212, 255, 0.1);
+        }
+        
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        
+        .source-name {
+            font-family: var(--font-heading);
+            color: var(--color-text-primary);
+            margin: 0 0 0.5rem 0;
+            font-size: 1.1rem;
+        }
+        
+        .source-url {
+            font-size: 0.8rem;
+            color: var(--color-accent-cyan);
+            word-break: break-all;
+        }
+        
+        .source-status {
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        
+        .status-active {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        
+        .status-maintenance {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+        
+        .status-deprecated {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .source-description {
+            color: var(--color-text-secondary);
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+        
+        .source-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: var(--color-bg-primary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-border);
+        }
+        
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .meta-label {
+            font-size: 0.8rem;
+            color: var(--color-text-muted);
+            margin-bottom: 0.2rem;
+        }
+        
+        .meta-value {
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+        
+        .source-tables {
+            margin-top: 1rem;
+        }
+        
+        .source-tables h4 {
+            color: var(--color-accent-cyan);
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+        }
+        
+        .table-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .table-tag {
+            padding: 0.2rem 0.6rem;
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid var(--color-accent-cyan);
+            border-radius: 12px;
+            font-size: 0.8rem;
+            color: var(--color-accent-cyan);
+        }
+        
+        .license-section {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 2rem;
+            margin: 4rem 0;
+        }
+        
+        .license-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .license-item {
+            background: var(--color-bg-tertiary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+        }
+        
+        .license-name {
+            font-family: var(--font-heading);
+            color: var(--color-accent-cyan);
+            margin-bottom: 0.5rem;
+        }
+        
+        .update-schedule {
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 2rem;
+            margin: 3rem 0;
+        }
+        
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        .schedule-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--color-bg-tertiary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--color-border);
+        }
+        
+        .schedule-source {
+            font-weight: 500;
+        }
+        
+        .schedule-frequency {
+            font-size: 0.9rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .contact-section {
+            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-large);
+            padding: 3rem;
+            text-align: center;
+            margin: 4rem 0;
+        }
+        
+        .contact-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+
+<body class="page-sources">
+    <header>
+        <div class="header-content">
+            <div class="header-left">
+                <div class="logo">
+                    <a href="/">ZEEKER</a>
+                </div>
+                <div class="tagline">The Legal Data Backbone</div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/-/metadata">API Info</a></li>
+                    <li><a href="/templates/pages/about">About</a></li>
+                    <li><a href="/templates/pages/sources" class="active">Sources</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="hero-section">
+            <h1>📋 Data Sources</h1>
+            <p>
+                Comprehensive attribution and information about the legal data sources 
+                powering Zeeker's Singapore legal database
+            </p>
+        </div>
+
+        <section class="intro-section">
+            <div class="card">
+                <h2>🔍 Data Collection Philosophy</h2>
+                <p>
+                    Zeeker aggregates legal information from authoritative Singapore government and judicial sources, 
+                    ensuring accuracy, completeness, and legal compliance. All data is collected through automated 
+                    processes that respect robots.txt guidelines and terms of service.
+                </p>
+                
+                <p>
+                    We maintain strict data integrity standards and provide full attribution to original sources. 
+                    Our platform serves as an access layer that enhances discoverability while respecting 
+                    the intellectual property and licensing requirements of data providers.
+                </p>
+            </div>
+        </section>
+
+        <section class="source-category">
+            <div class="category-header">
+                <span class="category-icon">🏛️</span>
+                <div>
+                    <h2 class="category-title">Supreme Court & Judicial Sources</h2>
+                    <p class="category-description">Court decisions, judgments, and legal precedents from Singapore's judicial system</p>
+                </div>
+            </div>
+            
+            <div class="source-grid">
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">Singapore Courts</h3>
+                            <a href="https://www.judiciary.gov.sg" class="source-url" target="_blank">judiciary.gov.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Official repository of court decisions from the Supreme Court, High Court, and subordinate courts. 
+                        Includes judgments, grounds of decision, and case summaries.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Daily</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">2000 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-28</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~12,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">supreme_court_decisions</span>
+                            <span class="table-tag">high_court_judgments</span>
+                            <span class="table-tag">case_summaries</span>
+                            <span class="table-tag">judicial_precedents</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">LawNet</h3>
+                            <a href="https://www.lawnet.sg" class="source-url" target="_blank">lawnet.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Comprehensive legal database maintained by the Singapore Academy of Law, 
+                        containing unreported judgments and legal commentary.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Weekly</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">1995 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-25</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~8,200</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">unreported_judgments</span>
+                            <span class="table-tag">legal_commentary</span>
+                            <span class="table-tag">case_analysis</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="source-category">
+            <div class="category-header">
+                <span class="category-icon">🏛️</span>
+                <div>
+                    <h2 class="category-title">Parliamentary & Legislative Sources</h2>
+                    <p class="category-description">Parliamentary proceedings, legislation, and regulatory documents</p>
+                </div>
+            </div>
+            
+            <div class="source-grid">
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">Parliament of Singapore</h3>
+                            <a href="https://www.parliament.gov.sg" class="source-url" target="_blank">parliament.gov.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Official parliamentary proceedings including debates, bills, motions, and committee reports 
+                        from Singapore's Parliament.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Session-based</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">1965 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-27</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~25,000</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">parliamentary_debates</span>
+                            <span class="table-tag">bills_and_acts</span>
+                            <span class="table-tag">committee_reports</span>
+                            <span class="table-tag">ministerial_statements</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">Singapore Statutes Online</h3>
+                            <a href="https://sso.agc.gov.sg" class="source-url" target="_blank">sso.agc.gov.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Authoritative source for Singapore's legislation including Acts, subsidiary legislation, 
+                        and consolidated statutes maintained by the Attorney-General's Chambers.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">As enacted</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">1965 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-28</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~1,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">acts_and_statutes</span>
+                            <span class="table-tag">subsidiary_legislation</span>
+                            <span class="table-tag">consolidated_versions</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="source-category">
+            <div class="category-header">
+                <span class="category-icon">📰</span>
+                <div>
+                    <h2 class="category-title">Legal News & Commentary</h2>
+                    <p class="category-description">Legal news, analysis, and professional commentary on Singapore law</p>
+                </div>
+            </div>
+            
+            <div class="source-grid">
+                <div class="source-card">
+                    <div class="source-header">
+                        <div>
+                            <h3 class="source-name">SG Law Watch</h3>
+                            <a href="https://sglawwatch.sg" class="source-url" target="_blank">sglawwatch.sg</a>
+                        </div>
+                        <span class="source-status status-active">Active</span>
+                    </div>
+                    
+                    <p class="source-description">
+                        Professional legal news and analysis covering Singapore's legal developments, 
+                        case commentary, and legislative updates.
+                    </p>
+                    
+                    <div class="source-meta">
+                        <div class="meta-item">
+                            <span class="meta-label">Update Frequency</span>
+                            <span class="meta-value">Daily</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Coverage Period</span>
+                            <span class="meta-value">2020 - Present</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Last Updated</span>
+                            <span class="meta-value">2025-05-28</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Record Count</span>
+                            <span class="meta-value">~3,500</span>
+                        </div>
+                    </div>
+                    
+                    <div class="source-tables">
+                        <h4>Available Tables:</h4>
+                        <div class="table-list">
+                            <span class="table-tag">legal_news</span>
+                            <span class="table-tag">case_commentary</span>
+                            <span class="table-tag">legal_analysis</span>
+                            <span class="table-tag">industry_updates</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="license-section">
+            <h2>📄 Licensing & Attribution</h2>
+            <p>
+                Zeeker respects the intellectual property rights of all data providers and operates under 
+                appropriate licensing frameworks:
+            </p>
+            
+            <div class="license-grid">
+                <div class="license-item">
+                    <h3 class="license-name">Government Sources</h3>
+                    <p>
+                        Data from government websites is typically available under the 
+                        Singapore Open Data License, allowing for reuse with proper attribution.
+                    </p>
+                </div>
+                
+                <div class="license-item">
+                    <h3 class="license-name">Judicial Decisions</h3>
+                    <p>
+                        Court judgments and decisions are in the public domain and freely accessible 
+                        for research and analysis purposes.
+                    </p>
+                </div>
+                
+                <div class="license-item">
+                    <h3 class="license-name">Parliamentary Proceedings</h3>
+                    <p>
+                        Parliamentary debates and official proceedings are public records 
+                        available for research and educational use.
+                    </p>
+                </div>
+                
+                <div class="license-item">
+                    <h3 class="license-name">Zeeker Platform</h3>
+                    <p>
+                        Our aggregated database and platform interface are provided under 
+                        Creative Commons Attribution 4.0 (CC-BY-4.0) license.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="update-schedule">
+            <h2>⏱️ Update Schedule</h2>
+            <p>
+                Different data sources have varying update frequencies based on their nature and availability:
+            </p>
+            
+            <div class="schedule-grid">
+                <div class="schedule-item">
+                    <span class="schedule-source">Court Decisions</span>
+                    <span class="schedule-frequency">Daily</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Parliamentary Debates</span>
+                    <span class="schedule-frequency">Session-based</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Legal News</span>
+                    <span class="schedule-frequency">Daily</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Legislation</span>
+                    <span class="schedule-frequency">As enacted</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Platform Sync</span>
+                    <span class="schedule-frequency">Hourly</span>
+                </div>
+                
+                <div class="schedule-item">
+                    <span class="schedule-source">Database Rebuild</span>
+                    <span class="schedule-frequency">Daily</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="quality-section">
+            <div class="card">
+                <h2>✅ Data Quality & Validation</h2>
+                <p>
+                    Zeeker implements comprehensive data quality measures to ensure accuracy and reliability:
+                </p>
+                
+                <div class="quality-measures">
+                    <div class="quality-item">
+                        <h3>🔍 Source Verification</h3>
+                        <p>All data sources are verified against official government and judicial websites</p>
+                    </div>
+                    
+                    <div class="quality-item">
+                        <h3>🔄 Consistency Checks</h3>
+                        <p>Automated validation ensures data consistency and identifies anomalies</p>
+                    </div>
+                    
+                    <div class="quality-item">
+                        <h3>📅 Freshness Monitoring</h3>
+                        <p>Active monitoring of source updates with alerts for stale or missing data</p>
+                    </div>
+                    
+                    <div class="quality-item">
+                        <h3>🏷️ Metadata Enrichment</h3>
+                        <p>Enhanced metadata and classification for improved searchability</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="contact-section">
+            <h2>📞 Data Source Inquiries</h2>
+            <p>
+                Questions about data sources, licensing, or access? We're here to help with 
+                any inquiries about the legal data available through Zeeker.
+            </p>
+            
+            <div class="contact-buttons">
+                <a href="mailto:data@zeeker.sg" class="btn btn-primary">📧 Contact Data Team</a>
+                <a href="/-/metadata" class="btn btn-secondary">📊 Technical Documentation</a>
+                <a href="/templates/pages/about" class="btn btn-secondary">ℹ️ Learn More</a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="/">Home</a>
+                <a href="/-/metadata">API Documentation</a>
+                <a href="/templates/pages/about">About</a>
+                <a href="/templates/pages/sources">Data Sources</a>
+                <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">License (CC-BY-4.0)</a>
+            </div>
+            <div class="footer-text">
+                <p>&copy; 2025 Zeeker - Singapore Legal Data Backbone</p>
+                <p>Comprehensive legal data with full source attribution and compliance</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="/static/js/zeeker-enhanced.js"></script>
+</body>
+</html>
