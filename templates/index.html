@@ -7,6 +7,9 @@
 <meta property="og:title" content="data.zeeker.sg - The Legal Data Backbone of the Zeeker Project">
 <meta property="og:description" content="A datastore to Singapore's legal data for data applications and AI">
 <meta property="og:type" content="website">
+
+<!-- Preload critical hero image -->
+<link rel="preload" href="/static/images/supcourt-sg.png" as="image">
 {% endblock %}
 
 {% block nav %}
@@ -28,19 +31,92 @@
 {% endblock %}
 
 {% block content %}
-<div class="hero-fullscreen">
-  <div class="hero-background-image"></div>
-  <div class="hero-content-overlay">
-    <h1>data.zeeker.sg</h1>
-    <p class="hero-tagline">
-      The data backbone of the Zeeker project, providing access to Singapore's legal data ecosystem.
-    </p>
+<!-- Enhanced Hero Banner Section -->
+<section class="hero-enhanced">
+    <div class="hero-bg-container">
+        <picture class="hero-background-picture">
+            <!-- WebP versions for modern browsers -->
+            <source
+                media="(max-width: 768px)"
+                srcset="/static/images/supcourt-sg-mobile.webp"
+                type="image/webp">
+            <source
+                media="(max-width: 1024px)"
+                srcset="/static/images/supcourt-sg-tablet.webp"
+                type="image/webp">
+            <source
+                media="(min-width: 1025px)"
+                srcset="/static/images/supcourt-sg.webp"
+                type="image/webp">
 
-    <form class="search-form-hero" action="/-/search">
-      <input type="search" name="q" placeholder="Search across all legal databases..." aria-label="Search legal data">
-    </form>
-  </div>
-</div>
+            <!-- PNG fallbacks -->
+            <source
+                media="(max-width: 768px)"
+                srcset="/static/images/supcourt-sg-mobile.png">
+            <source
+                media="(max-width: 1024px)"
+                srcset="/static/images/supcourt-sg-tablet.png">
+
+            <!-- Default fallback -->
+            <img
+                src="/static/images/supcourt-sg.png"
+                alt="Singapore Supreme Court"
+                class="hero-background-image loading"
+                loading="eager">
+        </picture>
+        <div class="hero-overlay-gradient"></div>
+    </div>
+
+    <div class="hero-content-wrapper">
+        <div class="hero-glass-card">
+            <h1 class="hero-title-main">data.zeeker.sg</h1>
+            <p class="hero-tagline-main">
+                Singapore's premier legal data backbone for research, analysis, and AI innovation
+            </p>
+
+            <div class="hero-search-container">
+                <form class="hero-search-form" action="/-/search">
+                    <div class="hero-search-wrapper">
+                        <input
+                            type="search"
+                            name="q"
+                            class="hero-search-input"
+                            placeholder="Search across all legal databases..."
+                            aria-label="Search legal data"
+                        >
+                    </div>
+                </form>
+            </div>
+
+            <div class="hero-cta-group">
+                <a href="/-/search" class="cta-primary">
+                    🔍 Start Searching
+                </a>
+                <a href="/-/metadata" class="cta-secondary">
+                    📊 Explore API
+                </a>
+            </div>
+
+            <div class="hero-features">
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🏛️</span>
+                    <span>10K+ Court Decisions</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">📊</span>
+                    <span>RESTful API Access</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🔒</span>
+                    <span>Immutable Data</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add proper spacing before next section -->
+<div class="section-spacer"></div>
 
 {% if databases %}
 <section class="databases-section">
@@ -115,6 +191,9 @@
   </div>
 </section>
 {% endif %}
+
+<!-- Add spacing before platform section -->
+<div class="section-spacer"></div>
 
 <section class="about-section">
   <div class="card">

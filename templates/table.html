@@ -2,17 +2,19 @@
 
 {% block extra_head %}
 {{ super() }}
-<meta name="description" content="Explore {{ table }} table in {{ database }} - {{ table_description or 'Singapore legal data' }}">
+<meta name="description" content="Explore {{ table }} in {{ database }} - Singapore legal data for research and analysis">
+<meta name="keywords" content="Singapore law, legal data, {{ table }}, {{ database }}, court decisions">
+<meta property="og:title" content="{{ table|title }} - {{ database|title }} - data.zeeker.sg">
+<meta property="og:description" content="Professional access to {{ table }} data from {{ database }} database">
+<meta property="og:type" content="website">
 {% endblock %}
 
 {% block nav %}
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -25,136 +27,132 @@
 </header>
 {% endblock %}
 
-{% block title %}
-{# Handle both table pages and row pages #}
-{% if row %}
-  {{ display_value or "Record" }} - {{ table }} - {{ database }}
-{% else %}
-  {{ table }} - {{ database }}
-{% endif %}
-{% endblock %}
-
 {% block content %}
-{# Different headers for table vs row pages #}
-{% if row %}
-  {# This is a single row page #}
-  <div class="row-header zeeker-custom">
-    <div class="breadcrumbs">
-      <a href="/">🏠 Home</a>
-      <span class="separator">→</span>
-      <a href="/{{ database }}">{{ database|title }}</a>
-      <span class="separator">→</span>
-      <a href="/{{ database }}/{{ table }}">{{ table|title }}</a>
-      <span class="separator">→</span>
-      <span>Record Details</span>
-    </div>
+<div class="table-header">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    <a href="/{{ database }}">{{ database|title }}</a>
+    <span class="separator">→</span>
+    <span>{{ table|title }}</span>
+  </div>
 
-    <h1>{{ table|title }} Record</h1>
+  <div class="table-overview">
+    <div class="table-info">
+      <div class="table-summary">
+        <h1 class="table-title">{{ table|title }} Table</h1>
 
-    {% if display_value %}
-    <p class="record-title">{{ display_value }}</p>
-    {% endif %}
+        {% if table_description %}
+        <p class="table-subtitle">{{ table_description }}</p>
+        {% else %}
+        <p class="table-subtitle">
+          Professional access to {{ table }} data from the {{ database }} database
+        </p>
+        {% endif %}
 
-    <div class="row-actions">
-      <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
-      <a href="{{ request.url }}.json" class="btn">📊 JSON</a>
-      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+        <div class="table-stats">
+          {% if row_count is defined and row_count is not none %}
+          <div class="stat-item">
+            <span class="stat-number">{{ "{:,}".format(row_count) }}</span>
+            <span class="stat-label">total rows</span>
+          </div>
+          {% endif %}
+
+          {% if columns %}
+          <div class="stat-item">
+            <span class="stat-number">{{ columns|length }}</span>
+            <span class="stat-label">column{{ columns|length|pluralize }}</span>
+          </div>
+          {% endif %}
+
+          {% if has_fts %}
+          <div class="stat-item">
+            <span class="stat-number">🔍</span>
+            <span class="stat-label">searchable</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-actions-section">
+        <div class="export-actions">
+          <a href="/{{ database }}/{{ table }}.json" class="btn btn-secondary">📊 JSON</a>
+          <a href="/{{ database }}/{{ table }}.csv" class="btn btn-secondary">📈 CSV</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn btn-secondary">💻 SQL</a>
+        </div>
+      </div>
     </div>
   </div>
-{% else %}
-  {# This is a table listing page #}
-  <div class="table-header zeeker-custom">
-    <div class="breadcrumbs">
-      <a href="/">🏠 Home</a>
-      <span class="separator">→</span>
-      <a href="/{{ database }}">{{ database|title }}</a>
-      <span class="separator">→</span>
-      <span>{{ table|title }}</span>
-    </div>
+</div>
 
-    <h1>{{ table|title }}</h1>
-
-    <div class="table-actions">
-      <a href="/{{ database }}/{{ table }}.json" class="btn">📊 JSON</a>
-      <a href="/{{ database }}/{{ table }}.csv" class="btn">📈 CSV</a>
-      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">💻 SQL</a>
-    </div>
-  </div>
-{% endif %}
-
-{# Let Datasette handle the core functionality #}
+{# Let Datasette handle the core table display #}
 {{ super() }}
 
-{# Add appropriate tools section #}
-{% if row %}
-  {# Tools for single record #}
-  <section class="row-tools zeeker-custom">
-    <div class="card">
-      <h2>🛠️ Record Tools</h2>
+<section class="table-tools">
+  <div class="card">
+    <h2>🛠️ Table Tools</h2>
 
-      <div class="tools-grid">
-        <div class="tool">
-          <h3>📊 Export Record</h3>
-          <p>Download this record in various formats</p>
-          <div class="export-options">
-            <a href="{{ request.url }}.json" class="btn">JSON</a>
-          </div>
-        </div>
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>💻 SQL Query</h3>
+        <p>Run custom SQL queries against this table</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+100" class="btn">Query Table</a>
+      </div>
 
-        <div class="tool">
-          <h3>🔍 Find Similar</h3>
-          <p>Search for similar records</p>
-          <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
-        </div>
+      <div class="tool">
+        <h3>📊 Schema</h3>
+        <p>Explore table structure and column details</p>
+        <a href="/{{ database }}?sql=PRAGMA+table_info(%22{{ table }}%22)" class="btn">View Schema</a>
+      </div>
 
-        <div class="tool">
-          <h3>💻 Query Builder</h3>
-          <p>Build custom queries</p>
-          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">SQL Editor</a>
+      <div class="tool">
+        <h3>📈 Export Data</h3>
+        <p>Download table data in various formats</p>
+        <div class="export-options">
+          <a href="/{{ database }}/{{ table }}.json" class="btn">JSON</a>
+          <a href="/{{ database }}/{{ table }}.csv" class="btn">CSV</a>
         </div>
       </div>
-    </div>
-  </section>
-{% else %}
-  {# Tools for table listing #}
-  <section class="table-tools zeeker-custom">
-    <div class="card">
-      <h2>🛠️ Table Tools</h2>
 
-      <div class="tools-grid">
-        <div class="tool">
-          <h3>💻 Custom SQL</h3>
-          <p>Write custom queries against this table</p>
-          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+" class="btn">Open SQL Editor</a>
-        </div>
+      {% if has_fts %}
+      <div class="tool">
+        <h3>🔍 Search</h3>
+        <p>Full-text search across table content</p>
+        <a href="/{{ database }}/{{ table }}?_search=" class="btn">Search Table</a>
+      </div>
+      {% endif %}
 
-        <div class="tool">
-          <h3>📊 Export Data</h3>
-          <p>Download table data in various formats</p>
-          <div class="export-options">
-            <a href="/{{ database }}/{{ table }}.json?_shape=array" class="btn">JSON Array</a>
-            <a href="/{{ database }}/{{ table }}.csv" class="btn">CSV File</a>
-          </div>
-        </div>
+      <div class="tool">
+        <h3>📋 Sample Data</h3>
+        <p>View random sample rows from this table</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+ORDER+BY+RANDOM()+LIMIT+10" class="btn">Random Sample</a>
+      </div>
 
-        <div class="tool">
-          <h3>🔗 API Access</h3>
-          <p>Programmatic access to this table</p>
-          <div class="api-examples">
-            <div class="api-example">
-              <label>REST API:</label>
-              <code>GET {{ request.url_root }}{{ database }}/{{ table }}.json</code>
-            </div>
-          </div>
-        </div>
-
-        <div class="tool">
-          <h3>📈 Analysis</h3>
-          <p>Quick data analysis and statistics</p>
-          <a href="/{{ database }}?sql=SELECT+COUNT(*)+FROM+%22{{ table }}%22" class="btn">Basic Stats</a>
-        </div>
+      <div class="tool">
+        <h3>📊 Statistics</h3>
+        <p>Basic statistics and data distribution</p>
+        <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_rows+FROM+%22{{ table }}%22" class="btn">View Stats</a>
       </div>
     </div>
-  </section>
+  </div>
+</section>
+
+{% if foreign_keys %}
+<section class="related-tables">
+  <div class="card">
+    <h2>🔗 Related Tables</h2>
+    <p>This table has relationships with other tables in the database:</p>
+
+    <div class="relationship-grid">
+      {% for fk in foreign_keys %}
+      <div class="relationship-card">
+        <h3>{{ fk.other_table|title }}</h3>
+        <p>Linked via <code>{{ fk.column }}</code> → <code>{{ fk.other_column }}</code></p>
+        <a href="/{{ database }}/{{ fk.other_table }}" class="btn">Explore {{ fk.other_table|title }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endif %}
 {% endblock %}

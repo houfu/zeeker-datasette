@@ -9,10 +9,8 @@
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -27,66 +25,83 @@
 
 {% block content %}
 <div class="database-header">
+  <!-- Breadcrumbs stay outside the card -->
   <div class="breadcrumbs">
     <a href="/">🏠 Home</a>
     <span class="separator">→</span>
     <span>{{ database|title }}</span>
   </div>
-  
-  <h1>{{ database|title }} Database</h1>
-  
-  {% if database_description %}
-  <p class="database-description">{{ database_description }}</p>
-  {% endif %}
-  
-  <div class="database-stats">
-    {% if tables %}
-    <div class="stat">
-      <span class="stat-number">{{ tables|length }}</span>
-      <span class="stat-label">table{{ tables|length|pluralize }}</span>
-    </div>
-    {% endif %}
 
-    {% if tables %}
-    {% set total_rows = tables|sum(attribute='count')|default(0) %}
-    {% if total_rows > 0 %}
-    <div class="stat">
-      <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
-      <span class="stat-label">total rows</span>
-    </div>
-    {% endif %}
-    {% endif %}
+  <!-- IMPROVED: Wrap everything in a proper overview card -->
+  <div class="database-overview">
+    <div class="database-info">
 
-    {% if database_size is defined and database_size %}
-    <div class="stat">
-      <span class="stat-number">{{ database_size|filesizeformat }}</span>
-      <span class="stat-label">database size</span>
-    </div>
-    {% endif %}
-  </div>
+      <!-- Left side: Title, description, stats -->
+      <div class="database-summary">
+        <h1 class="database-title">{{ database|title }} Database</h1>
 
-  <div class="database-actions">
-    <form class="search-form" action="/{{ database }}">
-      <input type="search" name="_search" placeholder="Search within {{ database }}..."
-             value="{{ request.args.get('_search', '') }}" aria-label="Search database">
-    </form>
+        {% if database_description %}
+        <p class="database-subtitle">{{ database_description }}</p>
+        {% else %}
+        <p class="database-subtitle">
+          Professional access to Singapore's legal data for research, analysis, and AI applications
+        </p>
+        {% endif %}
 
-    <div class="export-links">
-      <a href="/{{ database }}.json" class="btn">📊 JSON</a>
-      <a href="/{{ database }}.csv" class="btn">📈 CSV</a>
-      <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn">🔍 Schema</a>
+        <!-- Database Statistics -->
+        <div class="database-stats">
+          {% if tables %}
+          <div class="stat-item">
+            <span class="stat-number">{{ tables|length }}</span>
+            <span class="stat-label">table{{ tables|length|pluralize }}</span>
+          </div>
+          {% endif %}
+
+          {% if tables %}
+          {% set total_rows = tables|sum(attribute='count')|default(0) %}
+          {% if total_rows > 0 %}
+          <div class="stat-item">
+            <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
+            <span class="stat-label">total rows</span>
+          </div>
+          {% endif %}
+          {% endif %}
+
+          {% if database_size is defined and database_size %}
+          <div class="stat-item">
+            <span class="stat-number">{{ database_size|filesizeformat }}</span>
+            <span class="stat-label">database size</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Right side: Search and actions -->
+      <div class="database-actions-section">
+        <!-- Export Actions -->
+        <div class="export-actions">
+          <a href="/{{ database }}.json" class="btn btn-secondary">📊 JSON</a>
+          <a href="/{{ database }}.csv" class="btn btn-secondary">📈 CSV</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn btn-secondary">🔍 Schema</a>
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
 
 {% if search_query %}
-<div class="search-results-header">
-  <h2>Search Results for "{{ search_query }}"</h2>
-  {% if search_results %}
-  <p>Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}</p>
-  {% else %}
-  <p>No tables found matching your search.</p>
-  {% endif %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Search Results for "{{ search_query }}"</h2>
+    <p class="card-description">
+      {% if search_results %}
+      Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}
+      {% else %}
+      No tables found matching your search.
+      {% endif %}
+    </p>
+  </div>
 </div>
 {% endif %}
 

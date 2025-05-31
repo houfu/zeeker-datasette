@@ -20,7 +20,7 @@
     }
   },
   "extra_css_urls": [
-    "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
+    "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
     "/static/css/zeeker-theme.css"
   ],
   "extra_js_urls": [
