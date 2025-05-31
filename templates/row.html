@@ -9,10 +9,8 @@
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -28,8 +26,7 @@
 {% block title %}{{ display_value or "Record" }} - {{ table }} - {{ database }}{% endblock %}
 
 {% block content %}
-{# Custom header for row pages #}
-<div class="row-header zeeker-custom">
+<div class="row-header">
   <div class="breadcrumbs">
     <a href="/">🏠 Home</a>
     <span class="separator">→</span>
@@ -39,65 +36,141 @@
     <span class="separator">→</span>
     <span>Record Details</span>
   </div>
-  
-  <h1>{{ table|title }} Record</h1>
-  
-  {# Display the primary field value if available #}
-  {% if display_value %}
-  <p class="record-title">{{ display_value }}</p>
-  {% endif %}
-  
-  <div class="row-actions">
-    <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
-    <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">📊 JSON</a>
-    <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+
+  <div class="row-overview">
+    <div class="row-info">
+      <div class="row-summary">
+        <h1 class="row-title">{{ table|title }} Record</h1>
+
+        {% if display_value %}
+        <p class="row-subtitle">{{ display_value }}</p>
+        {% else %}
+        <p class="row-subtitle">
+          Individual record from the {{ table }} table
+        </p>
+        {% endif %}
+
+        <div class="row-stats">
+          <div class="stat-item">
+            <span class="stat-number">📄</span>
+            <span class="stat-label">single record</span>
+          </div>
+          {% if row_values and row_values|length %}
+          <div class="stat-item">
+            <span class="stat-number">{{ row_values|length }}</span>
+            <span class="stat-label">field{{ row_values|length|pluralize }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row-actions-section">
+        <div class="export-actions">
+          <a href="{{ request.url }}.json" class="btn btn-secondary">📊 JSON</a>
+          <a href="/{{ database }}/{{ table }}" class="btn btn-secondary">← Back to Table</a>
+          {% if pks %}
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+') }}" class="btn btn-secondary">💻 SQL</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-{# Let Datasette handle the row display #}
+{# Let Datasette handle the core record display #}
 {{ super() }}
 
-{# Add custom tools section #}
-<section class="row-tools zeeker-custom">
+<section class="row-tools">
   <div class="card">
     <h2>🛠️ Record Tools</h2>
-    
+
     <div class="tools-grid">
       <div class="tool">
         <h3>📊 Export Record</h3>
-        <p>Download this record in various formats</p>
+        <p>Download this specific record in various formats</p>
         <div class="export-options">
-          <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">JSON</a>
-          <a href="/{{ database }}/{{ table }}/{{ row_path }}.csv" class="btn">CSV</a>
+          <a href="{{ request.url }}.json" class="btn">JSON Format</a>
+          <a href="{{ request.url }}.csv" class="btn">CSV Format</a>
         </div>
       </div>
-      
+
       <div class="tool">
         <h3>🔍 Find Similar</h3>
-        <p>Search for similar records in this table</p>
-        <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
+        <p>Search for records with similar characteristics</p>
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse All Records</a>
       </div>
-      
+
       <div class="tool">
-        <h3>🔗 Relationships</h3>
-        <p>Explore related data and connections</p>
-        {% if foreign_key_tables %}
+        <h3>💻 Query Builder</h3>
+        <p>Build custom SQL queries based on this record</p>
+        {% if pk_path %}
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_path }}+LIMIT+10" class="btn">Query Similar</a>
+        {% else %}
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">Query Table</a>
+        {% endif %}
+      </div>
+
+      <div class="tool">
+        <h3>🔗 Table Context</h3>
+        <p>Explore the parent table and related data</p>
+        <div class="context-actions">
+          <a href="/{{ database }}/{{ table }}" class="btn">View {{ table|title }} Table</a>
+          <a href="/{{ database }}" class="btn">Browse {{ database|title }} Database</a>
+        </div>
+      </div>
+
+      {% if foreign_key_tables %}
+      <div class="tool">
+        <h3>🔗 Related Data</h3>
+        <p>Explore connections to other tables</p>
         <div class="related-tables">
           {% for fk_table in foreign_key_tables %}
           <a href="/{{ database }}/{{ fk_table.other_table }}" class="btn btn-small">{{ fk_table.other_table|title }}</a>
           {% endfor %}
         </div>
-        {% else %}
-        <p class="text-muted">No related tables found</p>
-        {% endif %}
       </div>
-      
+      {% endif %}
+
       <div class="tool">
-        <h3>💻 Query Builder</h3>
-        <p>Build custom queries based on this record</p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}+LIMIT+10" class="btn">Query Similar</a>
+        <h3>📈 Field Analysis</h3>
+        <p>Analyze field values and data patterns</p>
+        {% if row and row|length > 0 %}
+        {% set first_field = row|first %}
+        <a href="/{{ database }}?sql=SELECT+%22{{ first_field }}%22,+COUNT(*)+FROM+%22{{ table }}%22+GROUP+BY+%22{{ first_field }}%22+ORDER+BY+COUNT(*)+DESC" class="btn">Analyze Values</a>
+        {% else %}
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse Data</a>
+        {% endif %}
       </div>
     </div>
   </div>
 </section>
+
+{% if row_values %}
+<section class="record-metadata">
+  <div class="card">
+    <h2>📋 Record Metadata</h2>
+    <p>Technical information about this record and its fields</p>
+
+    <div class="metadata-grid">
+      <div class="metadata-item">
+        <h4>Record Source</h4>
+        <p>
+          <strong>Database:</strong> {{ database }}<br>
+          <strong>Table:</strong> {{ table }}<br>
+          <strong>Fields:</strong> {{ row_values|length }} total
+        </p>
+      </div>
+
+      <div class="metadata-item">
+        <h4>Data Access</h4>
+        <p>
+          <strong>JSON API:</strong> <a href="{{ request.url }}.json">{{ request.url }}.json</a><br>
+          <strong>Last Updated:</strong> Real-time access<br>
+          <strong>License:</strong> <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY-4.0</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 {% endblock %}

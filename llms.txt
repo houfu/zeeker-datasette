@@ -268,7 +268,7 @@ exec datasette serve --host 0.0.0.0 --port 8001 \
     }
   },
   "extra_css_urls": [
-    "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
+    "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap",
     "/static/css/zeeker-theme.css"
   ],
   "extra_js_urls": [
@@ -454,6 +454,155 @@ def prepare_jinja2_environment(env):
 </document_content>
 </document>
 <document index="11">
+<source>./scripts/convert_hero_image.py</source>
+<document_content>
+#!/usr/bin/env python3
+# /// script
+# dependencies = [
+#     "pillow>=10.0.0",
+# ]
+# ///
+"""
+Zeeker Image Converter - Convert hero images to WebP with multiple sizes
+Run with: uv run scripts/convert_hero_image.py
+"""
+
+import os
+from pathlib import Path
+from PIL import Image, ImageOps
+import sys
+
+
+def convert_hero_image(input_path: str, output_dir: str = "static/images"):
+    """Convert hero image to multiple WebP formats with PNG fallbacks."""
+
+    input_path = Path(input_path)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not input_path.exists():
+        print(f"❌ Input file not found: {input_path}")
+        return False
+
+    print(f"🖼️  Converting {input_path.name}...")
+
+    # Configuration for different sizes
+    sizes = {
+        "desktop": {
+            "size": (2560, 1440),
+            "quality_webp": 85,
+            "quality_png": 95,
+            "suffix": ""
+        },
+        "mobile": {
+            "size": (1280, 720),
+            "quality_webp": 80,
+            "quality_png": 90,
+            "suffix": "-mobile"
+        },
+        "tablet": {
+            "size": (1920, 1080),
+            "quality_webp": 82,
+            "quality_png": 92,
+            "suffix": "-tablet"
+        }
+    }
+
+    try:
+        with Image.open(input_path) as img:
+            print(f"📏 Original size: {img.size}")
+            print(f"🎨 Original mode: {img.mode}")
+
+            # Convert to RGB if necessary
+            if img.mode in ('RGBA', 'LA', 'P'):
+                print("🔄 Converting to RGB...")
+                # Create white background for transparent images
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                if img.mode == 'RGBA':
+                    background.paste(img, mask=img.split()[-1])
+                    img = background
+                else:
+                    img = img.convert('RGB')
+
+            base_name = "holographic-building"
+
+            for size_name, config in sizes.items():
+                print(f"\n📐 Creating {size_name} version ({config['size'][0]}x{config['size'][1]})...")
+
+                # Resize with high quality
+                resized = img.copy()
+                resized = ImageOps.fit(
+                    resized,
+                    config["size"],
+                    Image.Resampling.LANCZOS,
+                    centering=(0.5, 0.5)
+                )
+
+                # Save WebP
+                webp_path = output_dir / f"{base_name}{config['suffix']}.webp"
+                resized.save(
+                    webp_path,
+                    'WebP',
+                    quality=config['quality_webp'],
+                    optimize=True,
+                    method=6  # Best compression
+                )
+
+                # Save PNG fallback
+                png_path = output_dir / f"{base_name}{config['suffix']}.png"
+                resized.save(
+                    png_path,
+                    'PNG',
+                    optimize=True,
+                    compress_level=6
+                )
+
+                # Get file sizes
+                webp_size = webp_path.stat().st_size / 1024  # KB
+                png_size = png_path.stat().st_size / 1024  # KB
+                savings = ((png_size - webp_size) / png_size) * 100
+
+                print(f"  ✅ WebP: {webp_size:.1f}KB")
+                print(f"  ✅ PNG:  {png_size:.1f}KB")
+                print(f"  💾 Savings: {savings:.1f}%")
+
+        print(f"\n🎉 Conversion complete! Files saved to {output_dir}")
+        return True
+
+    except Exception as e:
+        print(f"❌ Error converting image: {e}")
+        return False
+
+
+def main():
+    """Main function to handle command line arguments."""
+    if len(sys.argv) < 2:
+        print("Usage: uv run convert_hero_image.py <input_image_path> [output_directory]")
+        print("Example: uv run convert_hero_image.py original_building.png static/images")
+        return
+
+    input_path = sys.argv[1]
+    output_dir = sys.argv[2] if len(sys.argv) > 2 else "static/images"
+
+    success = convert_hero_image(input_path, output_dir)
+
+    if success:
+        print("\n📋 Next steps:")
+        print("1. Update your CSS to use the new WebP images")
+        print("2. Add the WebP detection JavaScript")
+        print("3. Test the site with different browsers")
+        print("4. Consider using a CDN for even better performance")
+    else:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+</document_content>
+</document>
+<document index="12">
 <source>./scripts/download_from_s3.py</source>
 <document_content>
 #!/usr/bin/env python
@@ -540,7 +689,7 @@ if __name__ == "__main__":
     download_from_s3()
 </document_content>
 </document>
-<document index="12">
+<document index="13">
 <source>./scripts/manage.py</source>
 <document_content>
 # !/usr/bin/env python3
@@ -798,7 +947,7 @@ EOF
 
 </document_content>
 </document>
-<document index="13">
+<document index="14">
 <source>./templates/database.html</source>
 <document_content>
 {% extends "default:database.html" %}
@@ -812,10 +961,8 @@ EOF
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -830,66 +977,83 @@ EOF
 
 {% block content %}
 <div class="database-header">
+  <!-- Breadcrumbs stay outside the card -->
   <div class="breadcrumbs">
     <a href="/">🏠 Home</a>
     <span class="separator">→</span>
     <span>{{ database|title }}</span>
   </div>
-  
-  <h1>{{ database|title }} Database</h1>
-  
-  {% if database_description %}
-  <p class="database-description">{{ database_description }}</p>
-  {% endif %}
-  
-  <div class="database-stats">
-    {% if tables %}
-    <div class="stat">
-      <span class="stat-number">{{ tables|length }}</span>
-      <span class="stat-label">table{{ tables|length|pluralize }}</span>
-    </div>
-    {% endif %}
 
-    {% if tables %}
-    {% set total_rows = tables|sum(attribute='count')|default(0) %}
-    {% if total_rows > 0 %}
-    <div class="stat">
-      <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
-      <span class="stat-label">total rows</span>
-    </div>
-    {% endif %}
-    {% endif %}
+  <!-- IMPROVED: Wrap everything in a proper overview card -->
+  <div class="database-overview">
+    <div class="database-info">
 
-    {% if database_size is defined and database_size %}
-    <div class="stat">
-      <span class="stat-number">{{ database_size|filesizeformat }}</span>
-      <span class="stat-label">database size</span>
-    </div>
-    {% endif %}
-  </div>
+      <!-- Left side: Title, description, stats -->
+      <div class="database-summary">
+        <h1 class="database-title">{{ database|title }} Database</h1>
 
-  <div class="database-actions">
-    <form class="search-form" action="/{{ database }}">
-      <input type="search" name="_search" placeholder="Search within {{ database }}..."
-             value="{{ request.args.get('_search', '') }}" aria-label="Search database">
-    </form>
+        {% if database_description %}
+        <p class="database-subtitle">{{ database_description }}</p>
+        {% else %}
+        <p class="database-subtitle">
+          Professional access to Singapore's legal data for research, analysis, and AI applications
+        </p>
+        {% endif %}
 
-    <div class="export-links">
-      <a href="/{{ database }}.json" class="btn">📊 JSON</a>
-      <a href="/{{ database }}.csv" class="btn">📈 CSV</a>
-      <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn">🔍 Schema</a>
+        <!-- Database Statistics -->
+        <div class="database-stats">
+          {% if tables %}
+          <div class="stat-item">
+            <span class="stat-number">{{ tables|length }}</span>
+            <span class="stat-label">table{{ tables|length|pluralize }}</span>
+          </div>
+          {% endif %}
+
+          {% if tables %}
+          {% set total_rows = tables|sum(attribute='count')|default(0) %}
+          {% if total_rows > 0 %}
+          <div class="stat-item">
+            <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
+            <span class="stat-label">total rows</span>
+          </div>
+          {% endif %}
+          {% endif %}
+
+          {% if database_size is defined and database_size %}
+          <div class="stat-item">
+            <span class="stat-number">{{ database_size|filesizeformat }}</span>
+            <span class="stat-label">database size</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Right side: Search and actions -->
+      <div class="database-actions-section">
+        <!-- Export Actions -->
+        <div class="export-actions">
+          <a href="/{{ database }}.json" class="btn btn-secondary">📊 JSON</a>
+          <a href="/{{ database }}.csv" class="btn btn-secondary">📈 CSV</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn btn-secondary">🔍 Schema</a>
+        </div>
+
+      </div>
     </div>
   </div>
 </div>
 
 {% if search_query %}
-<div class="search-results-header">
-  <h2>Search Results for "{{ search_query }}"</h2>
-  {% if search_results %}
-  <p>Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}</p>
-  {% else %}
-  <p>No tables found matching your search.</p>
-  {% endif %}
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">Search Results for "{{ search_query }}"</h2>
+    <p class="card-description">
+      {% if search_results %}
+      Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}
+      {% else %}
+      No tables found matching your search.
+      {% endif %}
+    </p>
+  </div>
 </div>
 {% endif %}
 
@@ -1098,7 +1262,7 @@ EOF
 {% endblock %}
 </document_content>
 </document>
-<document index="14">
+<document index="15">
 <source>./templates/index.html</source>
 <document_content>
 {% extends "default:index.html" %}
@@ -1110,6 +1274,9 @@ EOF
 <meta property="og:title" content="data.zeeker.sg - The Legal Data Backbone of the Zeeker Project">
 <meta property="og:description" content="A datastore to Singapore's legal data for data applications and AI">
 <meta property="og:type" content="website">
+
+<!-- Preload critical hero image -->
+<link rel="preload" href="/static/images/supcourt-sg.png" as="image">
 {% endblock %}
 
 {% block nav %}
@@ -1131,19 +1298,92 @@ EOF
 {% endblock %}
 
 {% block content %}
-<div class="hero-fullscreen">
-  <div class="hero-background-image"></div>
-  <div class="hero-content-overlay">
-    <h1>data.zeeker.sg</h1>
-    <p class="hero-tagline">
-      The data backbone of the Zeeker project, providing access to Singapore's legal data ecosystem.
-    </p>
+<!-- Enhanced Hero Banner Section -->
+<section class="hero-enhanced">
+    <div class="hero-bg-container">
+        <picture class="hero-background-picture">
+            <!-- WebP versions for modern browsers -->
+            <source
+                media="(max-width: 768px)"
+                srcset="/static/images/supcourt-sg-mobile.webp"
+                type="image/webp">
+            <source
+                media="(max-width: 1024px)"
+                srcset="/static/images/supcourt-sg-tablet.webp"
+                type="image/webp">
+            <source
+                media="(min-width: 1025px)"
+                srcset="/static/images/supcourt-sg.webp"
+                type="image/webp">
 
-    <form class="search-form-hero" action="/-/search">
-      <input type="search" name="q" placeholder="Search across all legal databases..." aria-label="Search legal data">
-    </form>
-  </div>
-</div>
+            <!-- PNG fallbacks -->
+            <source
+                media="(max-width: 768px)"
+                srcset="/static/images/supcourt-sg-mobile.png">
+            <source
+                media="(max-width: 1024px)"
+                srcset="/static/images/supcourt-sg-tablet.png">
+
+            <!-- Default fallback -->
+            <img
+                src="/static/images/supcourt-sg.png"
+                alt="Singapore Supreme Court"
+                class="hero-background-image loading"
+                loading="eager">
+        </picture>
+        <div class="hero-overlay-gradient"></div>
+    </div>
+
+    <div class="hero-content-wrapper">
+        <div class="hero-glass-card">
+            <h1 class="hero-title-main">data.zeeker.sg</h1>
+            <p class="hero-tagline-main">
+                Singapore's premier legal data backbone for research, analysis, and AI innovation
+            </p>
+
+            <div class="hero-search-container">
+                <form class="hero-search-form" action="/-/search">
+                    <div class="hero-search-wrapper">
+                        <input
+                            type="search"
+                            name="q"
+                            class="hero-search-input"
+                            placeholder="Search across all legal databases..."
+                            aria-label="Search legal data"
+                        >
+                    </div>
+                </form>
+            </div>
+
+            <div class="hero-cta-group">
+                <a href="/-/search" class="cta-primary">
+                    🔍 Start Searching
+                </a>
+                <a href="/-/metadata" class="cta-secondary">
+                    📊 Explore API
+                </a>
+            </div>
+
+            <div class="hero-features">
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🏛️</span>
+                    <span>10K+ Court Decisions</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">📊</span>
+                    <span>RESTful API Access</span>
+                </div>
+                <div class="hero-feature">
+                    <span class="hero-feature-icon">🔒</span>
+                    <span>Immutable Data</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Add proper spacing before next section -->
+<div class="section-spacer"></div>
 
 {% if databases %}
 <section class="databases-section">
@@ -1218,6 +1458,9 @@ EOF
   </div>
 </section>
 {% endif %}
+
+<!-- Add spacing before platform section -->
+<div class="section-spacer"></div>
 
 <section class="about-section">
   <div class="card">
@@ -1322,7 +1565,7 @@ curl "https://data.zeeker.sg/courts/supreme_court.json?_shape=array"</code></pre
 {% endblock %}
 </document_content>
 </document>
-<document index="15">
+<document index="16">
 <source>./templates/query.html</source>
 <document_content>
 {% extends "default:query.html" %}
@@ -1330,59 +1573,14 @@ curl "https://data.zeeker.sg/courts/supreme_court.json?_shape=array"</code></pre
 {% block extra_head %}
 {{ super() }}
 <meta name="description" content="SQL Query Interface - Zeeker Legal Data Backbone">
-<style>
-  .sql-editor-container {
-    position: relative;
-  }
-  
-  .sql-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
-    border-top: none;
-    border-radius: 0 0 var(--border-radius) var(--border-radius);
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: 1000;
-    display: none;
-  }
-  
-  .suggestion-item {
-    padding: 0.8rem;
-    cursor: pointer;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    transition: var(--transition);
-  }
-  
-  .suggestion-item:hover {
-    background: rgba(0, 212, 255, 0.1);
-  }
-  
-  .suggestion-category {
-    font-weight: 600;
-    color: var(--color-accent-cyan);
-    font-size: 0.9rem;
-  }
-  
-  .suggestion-description {
-    font-size: 0.8rem;
-    color: var(--color-text-muted);
-    margin-top: 0.2rem;
-  }
-</style>
 {% endblock %}
 
 {% block nav %}
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -1786,7 +1984,7 @@ if (textarea) {
 {% endblock %}
 </document_content>
 </document>
-<document index="16">
+<document index="17">
 <source>./templates/row.html</source>
 <document_content>
 {% extends "default:row.html" %}
@@ -1800,10 +1998,8 @@ if (textarea) {
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -1819,8 +2015,7 @@ if (textarea) {
 {% block title %}{{ display_value or "Record" }} - {{ table }} - {{ database }}{% endblock %}
 
 {% block content %}
-{# Custom header for row pages #}
-<div class="row-header zeeker-custom">
+<div class="row-header">
   <div class="breadcrumbs">
     <a href="/">🏠 Home</a>
     <span class="separator">→</span>
@@ -1830,88 +2025,166 @@ if (textarea) {
     <span class="separator">→</span>
     <span>Record Details</span>
   </div>
-  
-  <h1>{{ table|title }} Record</h1>
-  
-  {# Display the primary field value if available #}
-  {% if display_value %}
-  <p class="record-title">{{ display_value }}</p>
-  {% endif %}
-  
-  <div class="row-actions">
-    <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
-    <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">📊 JSON</a>
-    <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+
+  <div class="row-overview">
+    <div class="row-info">
+      <div class="row-summary">
+        <h1 class="row-title">{{ table|title }} Record</h1>
+
+        {% if display_value %}
+        <p class="row-subtitle">{{ display_value }}</p>
+        {% else %}
+        <p class="row-subtitle">
+          Individual record from the {{ table }} table
+        </p>
+        {% endif %}
+
+        <div class="row-stats">
+          <div class="stat-item">
+            <span class="stat-number">📄</span>
+            <span class="stat-label">single record</span>
+          </div>
+          {% if row_values and row_values|length %}
+          <div class="stat-item">
+            <span class="stat-number">{{ row_values|length }}</span>
+            <span class="stat-label">field{{ row_values|length|pluralize }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="row-actions-section">
+        <div class="export-actions">
+          <a href="{{ request.url }}.json" class="btn btn-secondary">📊 JSON</a>
+          <a href="/{{ database }}/{{ table }}" class="btn btn-secondary">← Back to Table</a>
+          {% if pks %}
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+') }}" class="btn btn-secondary">💻 SQL</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
-{# Let Datasette handle the row display #}
+{# Let Datasette handle the core record display #}
 {{ super() }}
 
-{# Add custom tools section #}
-<section class="row-tools zeeker-custom">
+<section class="row-tools">
   <div class="card">
     <h2>🛠️ Record Tools</h2>
-    
+
     <div class="tools-grid">
       <div class="tool">
         <h3>📊 Export Record</h3>
-        <p>Download this record in various formats</p>
+        <p>Download this specific record in various formats</p>
         <div class="export-options">
-          <a href="/{{ database }}/{{ table }}/{{ row_path }}.json" class="btn">JSON</a>
-          <a href="/{{ database }}/{{ table }}/{{ row_path }}.csv" class="btn">CSV</a>
+          <a href="{{ request.url }}.json" class="btn">JSON Format</a>
+          <a href="{{ request.url }}.csv" class="btn">CSV Format</a>
         </div>
       </div>
-      
+
       <div class="tool">
         <h3>🔍 Find Similar</h3>
-        <p>Search for similar records in this table</p>
-        <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
+        <p>Search for records with similar characteristics</p>
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse All Records</a>
       </div>
-      
+
       <div class="tool">
-        <h3>🔗 Relationships</h3>
-        <p>Explore related data and connections</p>
-        {% if foreign_key_tables %}
+        <h3>💻 Query Builder</h3>
+        <p>Build custom SQL queries based on this record</p>
+        {% if pk_path %}
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_path }}+LIMIT+10" class="btn">Query Similar</a>
+        {% else %}
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">Query Table</a>
+        {% endif %}
+      </div>
+
+      <div class="tool">
+        <h3>🔗 Table Context</h3>
+        <p>Explore the parent table and related data</p>
+        <div class="context-actions">
+          <a href="/{{ database }}/{{ table }}" class="btn">View {{ table|title }} Table</a>
+          <a href="/{{ database }}" class="btn">Browse {{ database|title }} Database</a>
+        </div>
+      </div>
+
+      {% if foreign_key_tables %}
+      <div class="tool">
+        <h3>🔗 Related Data</h3>
+        <p>Explore connections to other tables</p>
         <div class="related-tables">
           {% for fk_table in foreign_key_tables %}
           <a href="/{{ database }}/{{ fk_table.other_table }}" class="btn btn-small">{{ fk_table.other_table|title }}</a>
           {% endfor %}
         </div>
-        {% else %}
-        <p class="text-muted">No related tables found</p>
-        {% endif %}
       </div>
-      
+      {% endif %}
+
       <div class="tool">
-        <h3>💻 Query Builder</h3>
-        <p>Build custom queries based on this record</p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}+LIMIT+10" class="btn">Query Similar</a>
+        <h3>📈 Field Analysis</h3>
+        <p>Analyze field values and data patterns</p>
+        {% if row and row|length > 0 %}
+        {% set first_field = row|first %}
+        <a href="/{{ database }}?sql=SELECT+%22{{ first_field }}%22,+COUNT(*)+FROM+%22{{ table }}%22+GROUP+BY+%22{{ first_field }}%22+ORDER+BY+COUNT(*)+DESC" class="btn">Analyze Values</a>
+        {% else %}
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse Data</a>
+        {% endif %}
       </div>
     </div>
   </div>
 </section>
+
+{% if row_values %}
+<section class="record-metadata">
+  <div class="card">
+    <h2>📋 Record Metadata</h2>
+    <p>Technical information about this record and its fields</p>
+
+    <div class="metadata-grid">
+      <div class="metadata-item">
+        <h4>Record Source</h4>
+        <p>
+          <strong>Database:</strong> {{ database }}<br>
+          <strong>Table:</strong> {{ table }}<br>
+          <strong>Fields:</strong> {{ row_values|length }} total
+        </p>
+      </div>
+
+      <div class="metadata-item">
+        <h4>Data Access</h4>
+        <p>
+          <strong>JSON API:</strong> <a href="{{ request.url }}.json">{{ request.url }}.json</a><br>
+          <strong>Last Updated:</strong> Real-time access<br>
+          <strong>License:</strong> <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY-4.0</a>
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
 {% endblock %}
 </document_content>
 </document>
-<document index="17">
+<document index="18">
 <source>./templates/table.html</source>
 <document_content>
 {% extends "default:table.html" %}
 
 {% block extra_head %}
 {{ super() }}
-<meta name="description" content="Explore {{ table }} table in {{ database }} - {{ table_description or 'Singapore legal data' }}">
+<meta name="description" content="Explore {{ table }} in {{ database }} - Singapore legal data for research and analysis">
+<meta name="keywords" content="Singapore law, legal data, {{ table }}, {{ database }}, court decisions">
+<meta property="og:title" content="{{ table|title }} - {{ database|title }} - data.zeeker.sg">
+<meta property="og:description" content="Professional access to {{ table }} data from {{ database }} database">
+<meta property="og:type" content="website">
 {% endblock %}
 
 {% block nav %}
 <header>
   <div class="header-content">
     <div class="header-left">
-      <div class="logo">
-        <a href="/">ZEEKER</a>
-      </div>
-      <div class="tagline">The Legal Data Backbone</div>
+      <div class="logo">data.zeeker.sg</div>
+      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
     </div>
     <nav>
       <ul>
@@ -1924,142 +2197,138 @@ if (textarea) {
 </header>
 {% endblock %}
 
-{% block title %}
-{# Handle both table pages and row pages #}
-{% if row %}
-  {{ display_value or "Record" }} - {{ table }} - {{ database }}
-{% else %}
-  {{ table }} - {{ database }}
-{% endif %}
-{% endblock %}
-
 {% block content %}
-{# Different headers for table vs row pages #}
-{% if row %}
-  {# This is a single row page #}
-  <div class="row-header zeeker-custom">
-    <div class="breadcrumbs">
-      <a href="/">🏠 Home</a>
-      <span class="separator">→</span>
-      <a href="/{{ database }}">{{ database|title }}</a>
-      <span class="separator">→</span>
-      <a href="/{{ database }}/{{ table }}">{{ table|title }}</a>
-      <span class="separator">→</span>
-      <span>Record Details</span>
-    </div>
+<div class="table-header">
+  <div class="breadcrumbs">
+    <a href="/">🏠 Home</a>
+    <span class="separator">→</span>
+    <a href="/{{ database }}">{{ database|title }}</a>
+    <span class="separator">→</span>
+    <span>{{ table|title }}</span>
+  </div>
 
-    <h1>{{ table|title }} Record</h1>
+  <div class="table-overview">
+    <div class="table-info">
+      <div class="table-summary">
+        <h1 class="table-title">{{ table|title }} Table</h1>
 
-    {% if display_value %}
-    <p class="record-title">{{ display_value }}</p>
-    {% endif %}
+        {% if table_description %}
+        <p class="table-subtitle">{{ table_description }}</p>
+        {% else %}
+        <p class="table-subtitle">
+          Professional access to {{ table }} data from the {{ database }} database
+        </p>
+        {% endif %}
 
-    <div class="row-actions">
-      <a href="/{{ database }}/{{ table }}" class="btn">← Back to Table</a>
-      <a href="{{ request.url }}.json" class="btn">📊 JSON</a>
-      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_link }}" class="btn">💻 SQL</a>
+        <div class="table-stats">
+          {% if row_count is defined and row_count is not none %}
+          <div class="stat-item">
+            <span class="stat-number">{{ "{:,}".format(row_count) }}</span>
+            <span class="stat-label">total rows</span>
+          </div>
+          {% endif %}
+
+          {% if columns %}
+          <div class="stat-item">
+            <span class="stat-number">{{ columns|length }}</span>
+            <span class="stat-label">column{{ columns|length|pluralize }}</span>
+          </div>
+          {% endif %}
+
+          {% if has_fts %}
+          <div class="stat-item">
+            <span class="stat-number">🔍</span>
+            <span class="stat-label">searchable</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-actions-section">
+        <div class="export-actions">
+          <a href="/{{ database }}/{{ table }}.json" class="btn btn-secondary">📊 JSON</a>
+          <a href="/{{ database }}/{{ table }}.csv" class="btn btn-secondary">📈 CSV</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn btn-secondary">💻 SQL</a>
+        </div>
+      </div>
     </div>
   </div>
-{% else %}
-  {# This is a table listing page #}
-  <div class="table-header zeeker-custom">
-    <div class="breadcrumbs">
-      <a href="/">🏠 Home</a>
-      <span class="separator">→</span>
-      <a href="/{{ database }}">{{ database|title }}</a>
-      <span class="separator">→</span>
-      <span>{{ table|title }}</span>
-    </div>
+</div>
 
-    <h1>{{ table|title }}</h1>
-
-    <div class="table-actions">
-      <a href="/{{ database }}/{{ table }}.json" class="btn">📊 JSON</a>
-      <a href="/{{ database }}/{{ table }}.csv" class="btn">📈 CSV</a>
-      <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">💻 SQL</a>
-    </div>
-  </div>
-{% endif %}
-
-{# Let Datasette handle the core functionality #}
+{# Let Datasette handle the core table display #}
 {{ super() }}
 
-{# Add appropriate tools section #}
-{% if row %}
-  {# Tools for single record #}
-  <section class="row-tools zeeker-custom">
-    <div class="card">
-      <h2>🛠️ Record Tools</h2>
+<section class="table-tools">
+  <div class="card">
+    <h2>🛠️ Table Tools</h2>
 
-      <div class="tools-grid">
-        <div class="tool">
-          <h3>📊 Export Record</h3>
-          <p>Download this record in various formats</p>
-          <div class="export-options">
-            <a href="{{ request.url }}.json" class="btn">JSON</a>
-          </div>
-        </div>
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>💻 SQL Query</h3>
+        <p>Run custom SQL queries against this table</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+100" class="btn">Query Table</a>
+      </div>
 
-        <div class="tool">
-          <h3>🔍 Find Similar</h3>
-          <p>Search for similar records</p>
-          <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
-        </div>
+      <div class="tool">
+        <h3>📊 Schema</h3>
+        <p>Explore table structure and column details</p>
+        <a href="/{{ database }}?sql=PRAGMA+table_info(%22{{ table }}%22)" class="btn">View Schema</a>
+      </div>
 
-        <div class="tool">
-          <h3>💻 Query Builder</h3>
-          <p>Build custom queries</p>
-          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">SQL Editor</a>
+      <div class="tool">
+        <h3>📈 Export Data</h3>
+        <p>Download table data in various formats</p>
+        <div class="export-options">
+          <a href="/{{ database }}/{{ table }}.json" class="btn">JSON</a>
+          <a href="/{{ database }}/{{ table }}.csv" class="btn">CSV</a>
         </div>
       </div>
-    </div>
-  </section>
-{% else %}
-  {# Tools for table listing #}
-  <section class="table-tools zeeker-custom">
-    <div class="card">
-      <h2>🛠️ Table Tools</h2>
 
-      <div class="tools-grid">
-        <div class="tool">
-          <h3>💻 Custom SQL</h3>
-          <p>Write custom queries against this table</p>
-          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+" class="btn">Open SQL Editor</a>
-        </div>
+      {% if has_fts %}
+      <div class="tool">
+        <h3>🔍 Search</h3>
+        <p>Full-text search across table content</p>
+        <a href="/{{ database }}/{{ table }}?_search=" class="btn">Search Table</a>
+      </div>
+      {% endif %}
 
-        <div class="tool">
-          <h3>📊 Export Data</h3>
-          <p>Download table data in various formats</p>
-          <div class="export-options">
-            <a href="/{{ database }}/{{ table }}.json?_shape=array" class="btn">JSON Array</a>
-            <a href="/{{ database }}/{{ table }}.csv" class="btn">CSV File</a>
-          </div>
-        </div>
+      <div class="tool">
+        <h3>📋 Sample Data</h3>
+        <p>View random sample rows from this table</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+ORDER+BY+RANDOM()+LIMIT+10" class="btn">Random Sample</a>
+      </div>
 
-        <div class="tool">
-          <h3>🔗 API Access</h3>
-          <p>Programmatic access to this table</p>
-          <div class="api-examples">
-            <div class="api-example">
-              <label>REST API:</label>
-              <code>GET {{ request.url_root }}{{ database }}/{{ table }}.json</code>
-            </div>
-          </div>
-        </div>
-
-        <div class="tool">
-          <h3>📈 Analysis</h3>
-          <p>Quick data analysis and statistics</p>
-          <a href="/{{ database }}?sql=SELECT+COUNT(*)+FROM+%22{{ table }}%22" class="btn">Basic Stats</a>
-        </div>
+      <div class="tool">
+        <h3>📊 Statistics</h3>
+        <p>Basic statistics and data distribution</p>
+        <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_rows+FROM+%22{{ table }}%22" class="btn">View Stats</a>
       </div>
     </div>
-  </section>
+  </div>
+</section>
+
+{% if foreign_keys %}
+<section class="related-tables">
+  <div class="card">
+    <h2>🔗 Related Tables</h2>
+    <p>This table has relationships with other tables in the database:</p>
+
+    <div class="relationship-grid">
+      {% for fk in foreign_keys %}
+      <div class="relationship-card">
+        <h3>{{ fk.other_table|title }}</h3>
+        <p>Linked via <code>{{ fk.column }}</code> → <code>{{ fk.other_column }}</code></p>
+        <a href="/{{ database }}/{{ fk.other_table }}" class="btn">Explore {{ fk.other_table|title }}</a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 {% endif %}
 {% endblock %}
 </document_content>
 </document>
-<document index="18">
+<document index="19">
 <source>./templates/pages/about.html</source>
 <document_content>
 <!DOCTYPE html>
@@ -2625,7 +2894,7 @@ if (textarea) {
 </html>
 </document_content>
 </document>
-<document index="19">
+<document index="20">
 <source>./templates/pages/sources.html</source>
 <document_content>
 <!DOCTYPE html>
@@ -3341,1236 +3610,1888 @@ if (textarea) {
 </html>
 </document_content>
 </document>
-<document index="20">
+<document index="21">
 <source>./static/js/zeeker-enhanced.js</source>
 <document_content>
 /**
- * Zeeker Enhanced JavaScript - Safe Version
- * Only adds enhancements without interfering with table visibility
+ * Zeeker Enhanced JavaScript - Cleaned Version
+ * Streamlined functionality for hero banner and core features
  */
 
 class ZeekerEnhancer {
-  constructor() {
-    this.init();
-  }
-
-  init() {
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('Zeeker Enhanced: Initializing...');
-      this.addBodyClasses();
-      this.enhanceSearch();
-      this.addCopyButtons();
-      this.enhanceExportLinks();
-      this.addKeyboardShortcuts();
-      // REMOVED: this.addTableEnhancements(); - This was hiding tables
-      console.log('Zeeker Enhanced: Initialization complete');
-    });
-  }
-
-  addBodyClasses() {
-    document.body.classList.add('zeeker-enhanced');
-
-    // Add specific page classes for enhanced styling
-    const path = window.location.pathname;
-    if (path === '/') {
-      document.body.classList.add('page-home');
-    } else if (path.includes('/query')) {
-      document.body.classList.add('page-query');
-    } else if (path.match(/\/[^/]+\/[^/]+$/)) {
-      document.body.classList.add('page-table');
-    } else if (path.match(/\/[^/]+$/)) {
-      document.body.classList.add('page-database');
+    constructor() {
+        this.init();
     }
-  }
 
-  enhanceSearch() {
-    const searchInputs = document.querySelectorAll('input[type="search"], input[name="q"]');
-
-    searchInputs.forEach(input => {
-      // Add keyboard shortcuts
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          input.blur();
+    init() {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.setupFeatures());
+        } else {
+            this.setupFeatures();
         }
-        if (e.key === 'Enter' && e.ctrlKey) {
-          // Ctrl+Enter for quick search
-          input.form?.submit();
+    }
+
+    setupFeatures() {
+        console.log('Zeeker Enhanced: Initializing...');
+
+        this.addBodyClasses();
+        this.enhanceHeroBanner();
+        this.addSearchEnhancements();
+        this.addCopyButtons();
+        this.addKeyboardShortcuts();
+        this.setupScrollToTop();
+
+        console.log('Zeeker Enhanced: Complete');
+    }
+
+    addBodyClasses() {
+        document.body.classList.add('zeeker-enhanced');
+
+        const path = window.location.pathname;
+        if (path === '/') {
+            document.body.classList.add('page-home');
+        } else if (path.includes('/query')) {
+            document.body.classList.add('page-query');
+        } else if (path.match(/\/[^/]+\/[^/]+$/)) {
+            document.body.classList.add('page-table');
+        } else if (path.match(/\/[^/]+$/)) {
+            document.body.classList.add('page-database');
         }
-      });
-    });
-  }
+    }
 
-  addCopyButtons() {
-    // Add copy buttons to code blocks only (not tables)
-    const codeElements = document.querySelectorAll('pre code, .highlight');
+    enhanceHeroBanner() {
+        const heroImage = document.querySelector('.hero-background-image');
+        if (!heroImage) return;
 
-    codeElements.forEach(element => {
-      if (element.closest('.copy-button-added')) return;
+        console.log('Zeeker: Enhancing hero banner...');
 
-      const wrapper = document.createElement('div');
-      wrapper.className = 'code-wrapper copy-button-added';
-      wrapper.style.position = 'relative';
+        const handleImageLoad = () => {
+            heroImage.classList.remove('loading');
+            heroImage.classList.add('loaded');
+            this.triggerContentAnimations();
+        };
 
-      element.parentNode.insertBefore(wrapper, element);
-      wrapper.appendChild(element);
+        const handleImageError = () => {
+            heroImage.classList.remove('loading');
+            heroImage.classList.add('error');
+            this.triggerContentAnimations();
+        };
 
-      const copyButton = document.createElement('button');
-      copyButton.className = 'copy-btn';
-      copyButton.innerHTML = '📋 Copy';
-      copyButton.style.cssText = `
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        background: var(--color-accent-primary);
-        color: white;
-        border: none;
-        padding: 0.4rem 0.8rem;
-        border-radius: 4px;
-        font-size: 0.8rem;
-        cursor: pointer;
-        z-index: 10;
-      `;
+        if (heroImage.complete && heroImage.naturalWidth > 0) {
+            handleImageLoad();
+        } else {
+            heroImage.addEventListener('load', handleImageLoad);
+            heroImage.addEventListener('error', handleImageError);
 
-      copyButton.addEventListener('click', () => {
-        const text = element.textContent;
-        navigator.clipboard.writeText(text).then(() => {
-          copyButton.innerHTML = '✅ Copied!';
-          setTimeout(() => {
+            setTimeout(() => {
+                if (!heroImage.classList.contains('loaded') && !heroImage.classList.contains('error')) {
+                    this.triggerContentAnimations();
+                }
+            }, 3000);
+        }
+
+        this.setupHeroSearch();
+        this.setupParallax(heroImage);
+    }
+
+    triggerContentAnimations() {
+        const contentWrapper = document.querySelector('.hero-content-wrapper');
+        if (contentWrapper) {
+            contentWrapper.classList.add('animate-in');
+        }
+    }
+
+    setupHeroSearch() {
+        const heroSearchInput = document.querySelector('.hero-search-input');
+        const heroSearchForm = document.querySelector('.hero-search-form');
+
+        if (!heroSearchInput || !heroSearchForm) return;
+
+        // Enhanced form submission
+        heroSearchForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const query = heroSearchInput.value.trim();
+
+            if (query) {
+                const wrapper = heroSearchInput.closest('.hero-search-wrapper');
+                wrapper.style.transform = 'scale(0.98)';
+                wrapper.style.opacity = '0.7';
+
+                setTimeout(() => {
+                    window.location.href = `/-/search?q=${encodeURIComponent(query)}`;
+                }, 300);
+            }
+        });
+
+        // Focus effects
+        heroSearchInput.addEventListener('focus', () => {
+            const wrapper = heroSearchInput.closest('.hero-search-wrapper');
+            if (wrapper) {
+                wrapper.style.transform = 'translateY(-2px) scale(1.02)';
+                wrapper.style.boxShadow = '0 0 35px rgba(0, 212, 255, 0.4)';
+            }
+        });
+
+        heroSearchInput.addEventListener('blur', () => {
+            const wrapper = heroSearchInput.closest('.hero-search-wrapper');
+            if (wrapper) {
+                wrapper.style.transform = 'translateY(0) scale(1)';
+                wrapper.style.boxShadow = '';
+            }
+        });
+
+        // Escape key
+        heroSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                heroSearchInput.blur();
+                heroSearchInput.value = '';
+            }
+        });
+    }
+
+    setupParallax(heroImage) {
+        // Only on larger screens and if motion is allowed
+        if (window.innerWidth <= 768 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            return;
+        }
+
+        let ticking = false;
+
+        const updateParallax = () => {
+            const scrollY = window.pageYOffset;
+            const scrollProgress = Math.min(scrollY / window.innerHeight, 1);
+
+            const parallaxY = scrollY * -0.4;
+            const scale = 1.05 + (scrollProgress * 0.02);
+            const opacity = Math.max(0.1, 0.35 - (scrollProgress * 0.25));
+
+            heroImage.style.transform = `translate3d(0, ${parallaxY}px, 0) scale(${scale})`;
+            heroImage.style.opacity = opacity;
+
+            ticking = false;
+        };
+
+        const handleScroll = () => {
+            if (!ticking) {
+                requestAnimationFrame(updateParallax);
+                ticking = true;
+            }
+        };
+
+        window.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    addSearchEnhancements() {
+        const searchInputs = document.querySelectorAll('input[type="search"], input[name="q"]');
+
+        searchInputs.forEach(input => {
+            if (input.classList.contains('hero-search-input')) return;
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    input.blur();
+                }
+                if (e.key === 'Enter' && e.ctrlKey) {
+                    input.form?.submit();
+                }
+            });
+        });
+    }
+
+    addCopyButtons() {
+        const codeElements = document.querySelectorAll('pre code, .highlight');
+
+        codeElements.forEach(element => {
+            if (element.closest('.copy-button-added')) return;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-wrapper copy-button-added';
+            wrapper.style.position = 'relative';
+
+            element.parentNode.insertBefore(wrapper, element);
+            wrapper.appendChild(element);
+
+            const copyButton = document.createElement('button');
+            copyButton.className = 'copy-btn';
             copyButton.innerHTML = '📋 Copy';
-          }, 2000);
+            copyButton.style.cssText = `
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: var(--color-accent-primary);
+                color: white;
+                border: none;
+                padding: 0.4rem 0.8rem;
+                border-radius: 4px;
+                font-size: 0.8rem;
+                cursor: pointer;
+                z-index: 10;
+                transition: all 0.2s ease;
+            `;
+
+            copyButton.addEventListener('click', () => {
+                const text = element.textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                    copyButton.innerHTML = '✅ Copied!';
+                    copyButton.style.background = 'var(--color-success, #10B981)';
+                    setTimeout(() => {
+                        copyButton.innerHTML = '📋 Copy';
+                        copyButton.style.background = 'var(--color-accent-primary)';
+                    }, 2000);
+                });
+            });
+
+            wrapper.appendChild(copyButton);
         });
-      });
+    }
 
-      wrapper.appendChild(copyButton);
-    });
-  }
+    addKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-  enhanceExportLinks() {
-    const exportLinks = document.querySelectorAll('.export-links a, a[href$=".csv"], a[href$=".json"]');
+            switch (e.key) {
+                case '/':
+                    e.preventDefault();
+                    const heroSearchInput = document.querySelector('.hero-search-input');
+                    const searchInput = heroSearchInput || document.querySelector('input[name="q"]');
+                    if (searchInput) {
+                        searchInput.focus();
+                    }
+                    break;
 
-    exportLinks.forEach(link => {
-      link.addEventListener('click', (e) => {
-        // Add loading state
-        const originalText = link.textContent;
-        link.textContent = '⬇️ Downloading...';
-        link.style.pointerEvents = 'none';
+                case 'h':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        window.location.href = '/';
+                    }
+                    break;
 
-        setTimeout(() => {
-          link.textContent = originalText;
-          link.style.pointerEvents = 'auto';
-        }, 2000);
-      });
-    });
-  }
+                case 'b':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        window.history.back();
+                    }
+                    break;
+            }
+        });
+    }
 
-  addKeyboardShortcuts() {
-    document.addEventListener('keydown', (e) => {
-      // Only activate shortcuts when not in input fields
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    setupScrollToTop() {
+        if (window.location.pathname !== '/') return;
 
-      switch (e.key) {
-        case '/':
-          e.preventDefault();
-          const searchInput = document.querySelector('input[name="q"]');
-          if (searchInput) {
-            searchInput.focus();
-          }
-          break;
+        let scrollToTopBtn = document.querySelector('.scroll-to-top');
 
-        case 'h':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            window.location.href = '/';
-          }
-          break;
+        if (!scrollToTopBtn) {
+            scrollToTopBtn = document.createElement('button');
+            scrollToTopBtn.className = 'scroll-to-top';
+            scrollToTopBtn.innerHTML = '↑';
+            scrollToTopBtn.style.cssText = `
+                position: fixed;
+                bottom: 2rem;
+                right: 2rem;
+                width: 50px;
+                height: 50px;
+                background: var(--color-accent-primary);
+                color: white;
+                border: none;
+                border-radius: 50%;
+                font-size: 1.2rem;
+                cursor: pointer;
+                z-index: 1000;
+                opacity: 0;
+                transform: translateY(100px);
+                transition: all 0.3s ease;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            `;
+            document.body.appendChild(scrollToTopBtn);
+        }
 
-        case 'b':
-          if (e.ctrlKey) {
-            e.preventDefault();
-            window.history.back();
-          }
-          break;
-      }
-    });
-  }
+        window.addEventListener('scroll', () => {
+            if (window.pageYOffset > window.innerHeight) {
+                scrollToTopBtn.style.opacity = '1';
+                scrollToTopBtn.style.transform = 'translateY(0)';
+            } else {
+                scrollToTopBtn.style.opacity = '0';
+                scrollToTopBtn.style.transform = 'translateY(100px)';
+            }
+        });
+
+        scrollToTopBtn.addEventListener('click', () => {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        });
+    }
 }
 
-// Initialize the enhancer
+// Viewport height fix for mobile
+function updateViewportHeight() {
+    const vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+
+window.addEventListener('resize', updateViewportHeight);
+window.addEventListener('orientationchange', updateViewportHeight);
+updateViewportHeight();
+
+// Initialize
 new ZeekerEnhancer();
-
-class ZeekerFullViewportHero {
-  constructor() {
-    this.init();
-  }
-
-  init() {
-    document.addEventListener('DOMContentLoaded', () => {
-      this.setupHeroEnhancements();
-      this.addScrollIndicator();
-      this.handleViewportResize();
-      this.optimizeImageLoading();
-      this.addKeyboardNavigation();
-    });
-  }
-
-  setupHeroEnhancements() {
-    // Add body classes for styling coordination
-    const heroElement = document.querySelector('.hero-fullscreen, .hero-split-viewport, .hero-immersive-full');
-
-    if (heroElement) {
-      if (heroElement.classList.contains('hero-fullscreen')) {
-        document.body.classList.add('hero-fullscreen-active');
-      } else if (heroElement.classList.contains('hero-split-viewport')) {
-        document.body.classList.add('hero-split-active');
-      } else if (heroElement.classList.contains('hero-immersive-full')) {
-        document.body.classList.add('hero-immersive-active');
-      }
-    }
-
-    // Enhanced search form functionality
-    const heroSearchForm = document.querySelector('.search-form-hero');
-    if (heroSearchForm) {
-      this.enhanceHeroSearch(heroSearchForm);
-    }
-
-    // Add parallax scrolling for immersive hero
-    if (document.querySelector('.hero-immersive-full')) {
-      this.addParallaxScrolling();
-    }
-  }
-
-  enhanceHeroSearch(form) {
-    const input = form.querySelector('input');
-
-    // Add auto-complete suggestions
-    this.addSearchAutoComplete(input);
-
-    // Add search animation
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.animateSearch(input);
-
-      // Simulate search - replace with actual search logic
-      setTimeout(() => {
-        if (input.value.trim()) {
-          window.location.href = `/-/search?q=${encodeURIComponent(input.value)}`;
-        }
-      }, 500);
-    });
-
-    // Add keyboard shortcuts
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        input.blur();
-        input.value = '';
-      }
-    });
-  }
-
-  addSearchAutoComplete(input) {
-    const suggestions = [
-      'court decisions',
-      'supreme court',
-      'high court',
-      'parliamentary debates',
-      'legal regulations',
-      'case law',
-      'statutory instruments',
-      'legal precedents',
-      'contract law',
-      'criminal law',
-      'civil procedure'
-    ];
-
-    let suggestionContainer = null;
-
-    input.addEventListener('input', () => {
-      this.showSearchSuggestions(input, suggestions);
-    });
-
-    input.addEventListener('blur', () => {
-      setTimeout(() => this.hideSearchSuggestions(), 200);
-    });
-  }
-
-  showSearchSuggestions(input, suggestions) {
-    const query = input.value.toLowerCase().trim();
-
-    if (query.length < 2) {
-      this.hideSearchSuggestions();
-      return;
-    }
-
-    const matches = suggestions.filter(s =>
-      s.toLowerCase().includes(query)
-    ).slice(0, 5);
-
-    if (matches.length === 0) {
-      this.hideSearchSuggestions();
-      return;
-    }
-
-    let container = document.getElementById('hero-search-suggestions');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'hero-search-suggestions';
-      container.className = 'hero-search-suggestions';
-      input.parentNode.appendChild(container);
-    }
-
-    container.innerHTML = matches.map(match =>
-      `<div class="suggestion-item" data-value="${match}">
-        <span class="suggestion-icon">🔍</span>
-        <span class="suggestion-text">${match}</span>
-      </div>`
-    ).join('');
-
-    container.style.display = 'block';
-
-    // Add click handlers
-    container.querySelectorAll('.suggestion-item').forEach(item => {
-      item.addEventListener('click', () => {
-        input.value = item.dataset.value;
-        this.hideSearchSuggestions();
-        input.form.dispatchEvent(new Event('submit'));
-      });
-    });
-
-    this.addSuggestionStyles();
-  }
-
-  hideSearchSuggestions() {
-    const container = document.getElementById('hero-search-suggestions');
-    if (container) {
-      container.style.display = 'none';
-    }
-  }
-
-  addSuggestionStyles() {
-    if (document.getElementById('hero-search-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'hero-search-styles';
-    style.textContent = `
-      .hero-search-suggestions {
-        position: absolute;
-        top: 100%;
-        left: 0;
-        right: 0;
-        background: rgba(17, 17, 17, 0.95);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(0, 212, 255, 0.3);
-        border-top: none;
-        border-radius: 0 0 25px 25px;
-        max-height: 300px;
-        overflow-y: auto;
-        z-index: 1000;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      }
-
-      .suggestion-item {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        padding: 1rem 1.5rem;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      .suggestion-item:hover {
-        background: rgba(0, 212, 255, 0.1);
-        color: var(--color-accent-cyan);
-      }
-
-      .suggestion-item:last-child {
-        border-bottom: none;
-      }
-
-      .suggestion-icon {
-        opacity: 0.7;
-      }
-
-      .suggestion-text {
-        flex: 1;
-        color: var(--color-text-secondary);
-      }
-
-      .suggestion-item:hover .suggestion-text {
-        color: var(--color-text-primary);
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  animateSearch(input) {
-    input.style.transform = 'scale(0.98)';
-    input.style.opacity = '0.8';
-
-    setTimeout(() => {
-      input.style.transform = 'scale(1)';
-      input.style.opacity = '1';
-    }, 200);
-  }
-
-  addScrollIndicator() {
-    const heroElement = document.querySelector('.hero-fullscreen, .hero-split-viewport, .hero-immersive-full');
-    if (!heroElement) return;
-
-    const indicator = document.createElement('div');
-    indicator.className = 'scroll-indicator';
-    indicator.innerHTML = `
-      <div class="scroll-arrow">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M7 13l3 3 7-7"></path>
-          <path d="M7 6l3 3 7-7"></path>
-        </svg>
-      </div>
-      <span>Scroll to explore</span>
-    `;
-
-    heroElement.appendChild(indicator);
-    this.addScrollIndicatorStyles();
-
-    // Hide indicator on scroll
-    let ticking = false;
-    window.addEventListener('scroll', () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const scrolled = window.pageYOffset > 100;
-          indicator.style.opacity = scrolled ? '0' : '1';
-          indicator.style.transform = scrolled ? 'translateY(20px)' : 'translateY(0)';
-          ticking = false;
-        });
-        ticking = true;
-      }
-    });
-  }
-
-  addScrollIndicatorStyles() {
-    if (document.getElementById('scroll-indicator-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'scroll-indicator-styles';
-    style.textContent = `
-      .scroll-indicator {
-        position: absolute;
-        bottom: 2rem;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.5rem;
-        color: var(--color-text-muted);
-        font-size: 0.9rem;
-        opacity: 0.8;
-        transition: all 0.3s ease;
-        animation: bounce 2s infinite;
-      }
-
-      .scroll-arrow {
-        transform: rotate(90deg);
-        opacity: 0.7;
-      }
-
-      @keyframes bounce {
-        0%, 20%, 50%, 80%, 100% {
-          transform: translateX(-50%) translateY(0);
-        }
-        40% {
-          transform: translateX(-50%) translateY(-10px);
-        }
-        60% {
-          transform: translateX(-50%) translateY(-5px);
-        }
-      }
-
-      @media (max-width: 768px) {
-        .scroll-indicator {
-          bottom: 1rem;
-          font-size: 0.8rem;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  addParallaxScrolling() {
-    const parallaxElement = document.querySelector('.hero-immersive-bg');
-    if (!parallaxElement) return;
-
-    let ticking = false;
-
-    window.addEventListener('scroll', () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          const scrolled = window.pageYOffset;
-          const rate = scrolled * -0.5;
-          parallaxElement.style.transform = `translate3d(0, ${rate}px, 0)`;
-          ticking = false;
-        });
-        ticking = true;
-      }
-    });
-  }
-
-  handleViewportResize() {
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        this.updateViewportHeight();
-      }, 250);
-    });
-  }
-
-  updateViewportHeight() {
-    const heroElements = document.querySelectorAll('.hero-fullscreen, .hero-split-viewport, .hero-immersive-full');
-    heroElements.forEach(hero => {
-      hero.style.height = `${window.innerHeight}px`;
-    });
-  }
-
-  optimizeImageLoading() {
-    // Preload the hero image
-    const img = new Image();
-    img.src = '/static/images/holographic-building.png';
-
-    // Add intersection observer for lazy loading optimization
-    if ('IntersectionObserver' in window) {
-      const heroImages = document.querySelectorAll('.hero-building-image');
-      const imageObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('loaded');
-            imageObserver.unobserve(entry.target);
-          }
-        });
-      });
-
-      heroImages.forEach(img => imageObserver.observe(img));
-    }
-  }
-
-  addKeyboardNavigation() {
-    document.addEventListener('keydown', (e) => {
-      // Skip if user is typing in an input
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-      switch (e.key) {
-        case '/':
-          e.preventDefault();
-          const searchInput = document.querySelector('.search-form-hero input');
-          if (searchInput) {
-            searchInput.focus();
-          }
-          break;
-
-        case 'Escape':
-          const activeInput = document.activeElement;
-          if (activeInput.tagName === 'INPUT') {
-            activeInput.blur();
-          }
-          this.hideSearchSuggestions();
-          break;
-      }
-    });
-  }
-}
-
-// Initialize the full viewport hero enhancement
-new ZeekerFullViewportHero();
-
-// Debug helper - shows when tables are being manipulated
-const originalHide = Element.prototype.style.setProperty;
-Element.prototype.style.setProperty = function(property, value, priority) {
-  if ((property === 'display' && value === 'none') ||
-      (property === 'visibility' && value === 'hidden') ||
-      (property === 'opacity' && value === '0')) {
-    if (this.tagName === 'TR' || this.tagName === 'TABLE' || this.closest('table')) {
-      console.warn('WARNING: Something is trying to hide table element:', this, property, value);
-      console.trace(); // This will show what's calling it
-      return; // Prevent hiding table elements
-    }
-  }
-  return originalHide.call(this, property, value, priority);
-};
 </document_content>
 </document>
-<document index="21">
+<document index="22">
 <source>./static/css/zeeker-theme.css</source>
 <document_content>
-/* Zeeker Datasette - Fixed Table Visibility */
+/*
+ * Zeeker CSS - Clean Foundation
+ * Streamlined, maintainable styling system
+ */
 
 :root {
-  /* Professional Color Palette */
-  --color-bg-primary: #1a1a1a;
-  --color-bg-secondary: #2a2a2a;
-  --color-bg-tertiary: #3a3a3a;
-  --color-bg-elevated: #404040;
+    /* Color System */
+    --color-bg-primary: #1a1a1a;
+    --color-bg-secondary: #2a2a2a;
+    --color-bg-tertiary: #3a3a3a;
+    --color-bg-elevated: #404040;
 
-  /* Professional Blue Accent System */
-  --color-accent-primary: #4A90E2;
-  --color-accent-hover: #357ABD;
-  --color-accent-light: #6BA3E8;
-  --color-accent-subtle: rgba(74, 144, 226, 0.15);
+    --color-accent-primary: #4A90E2;
+    --color-accent-hover: #357ABD;
+    --color-accent-cyan: #00D4FF;
+    --color-accent-magenta: #FF006E;
 
-  /* Text Colors */
-  --color-text-primary: #FFFFFF;
-  --color-text-secondary: #E0E0E0;
-  --color-text-muted: #B0B0B0;
-  --color-text-inverse: #FFFFFF;
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #E0E0E0;
+    --color-text-muted: #B0B0B0;
 
-  /* Borders */
-  --color-border: #404040;
-  --color-border-hover: #606060;
-  --color-border-focus: var(--color-accent-primary);
+    --color-border: #404040;
+    --color-border-hover: #606060;
 
-  /* Typography */
-  --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, monospace;
+    /* Spacing Scale */
+    --space-xs: 0.5rem;
+    --space-sm: 0.75rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+    --space-2xl: 3rem;
+    --space-3xl: 4rem;
 
-  /* Layout */
-  --border-radius: 8px;
-  --border-radius-large: 12px;
-  --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-medium: 0 4px 16px rgba(0, 0, 0, 0.2);
-  --transition: all 0.2s ease;
+    /* Typography Scale */
+    --text-xs: 0.75rem;
+    --text-sm: 0.875rem;
+    --text-base: 1rem;
+    --text-lg: 1.125rem;
+    --text-xl: 1.25rem;
+    --text-2xl: 1.5rem;
+    --text-3xl: 1.875rem;
+    --text-4xl: 2.25rem;
+
+    /* Design System */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.5rem;
+
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+
+    --transition-fast: 150ms ease;
+    --transition-base: 250ms ease;
+    --transition-slow: 500ms ease;
+
+    --z-dropdown: 1000;
+    --z-sticky: 1020;
+    --z-modal: 1040;
+
+    /* Custom viewport height for mobile */
+    --vh: 1vh;
 }
 
-/* CRITICAL: Force base styles */
-* {
-  box-sizing: border-box;
+/*
+ * BASE STYLES
+ */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
 }
 
 html {
-  background: var(--color-bg-primary) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1.6;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--color-bg-primary) !important;
-  color: var(--color-text-secondary) !important;
-  font-family: var(--font-body) !important;
-  line-height: 1.6;
-  margin: 0;
-  padding: 0;
-  min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    font-size: var(--text-base);
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
 }
 
-/* CRITICAL: Table Visibility Fixes */
-table,
-.rows-and-columns,
-table.rows-and-columns {
-  background: var(--color-bg-secondary) !important;
-  color: var(--color-text-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-collapse: collapse !important;
-  width: 100% !important;
-  margin: 1rem 0 !important;
-}
-
-/* Table Headers - MUST BE VISIBLE */
-table th,
-.rows-and-columns th,
-table.rows-and-columns th {
-  background: var(--color-bg-tertiary) !important;
-  color: var(--color-text-primary) !important;
-  padding: 0.75rem 1rem !important;
-  font-weight: 600 !important;
-  text-align: left !important;
-  border: 1px solid var(--color-border) !important;
-  border-bottom: 2px solid var(--color-border-hover) !important;
-  font-size: 0.9rem !important;
-}
-
-/* Table Cells - CRITICAL VISIBILITY FIX */
-table td,
-.rows-and-columns td,
-table.rows-and-columns td {
-  background: var(--color-bg-secondary) !important;
-  color: var(--color-text-secondary) !important;
-  padding: 0.75rem 1rem !important;
-  border: 1px solid var(--color-border) !important;
-  font-size: 0.9rem !important;
-  vertical-align: top !important;
-  line-height: 1.4 !important;
-  word-wrap: break-word !important;
-}
-
-/* Table Rows - HOVER EFFECTS */
-table tr,
-.rows-and-columns tr,
-table.rows-and-columns tr {
-  background: var(--color-bg-secondary) !important;
-}
-
-table tr:hover,
-.rows-and-columns tr:hover,
-table.rows-and-columns tr:hover {
-  background: var(--color-bg-tertiary) !important;
-}
-
-table tr:hover td,
-.rows-and-columns tr:hover td,
-table.rows-and-columns tr:hover td {
-  background: var(--color-bg-tertiary) !important;
-  color: var(--color-text-primary) !important;
-}
-
-/* Table Links */
-table a,
-.rows-and-columns a,
-table.rows-and-columns a {
-  color: var(--color-accent-primary) !important;
-  text-decoration: none !important;
-}
-
-table a:hover,
-.rows-and-columns a:hover,
-table.rows-and-columns a:hover {
-  color: var(--color-accent-light) !important;
-  text-decoration: underline !important;
-}
-
-/* Table Container */
-.table-wrapper {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--border-radius-large) !important;
-  overflow: auto !important;
-  margin: 1rem 0 !important;
-  box-shadow: var(--shadow-subtle) !important;
-}
-
-/* Typography */
+/*
+ * TYPOGRAPHY
+ */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading) !important;
-  color: var(--color-text-primary) !important;
-  font-weight: 600;
-  line-height: 1.3;
-  margin: 0 0 1rem 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-weight: 600;
+    line-height: 1.3;
+    margin: 0 0 var(--space-md) 0;
+    color: var(--color-text-primary);
 }
 
-h1 { font-size: 2.5rem; }
-h2 { font-size: 2rem; }
-h3 { font-size: 1.5rem; }
+h1 { font-size: var(--text-4xl); }
+h2 { font-size: var(--text-3xl); }
+h3 { font-size: var(--text-2xl); }
+h4 { font-size: var(--text-xl); }
+h5 { font-size: var(--text-lg); }
+h6 { font-size: var(--text-base); }
 
 p {
-  color: var(--color-text-secondary) !important;
-  margin-bottom: 1rem;
+    margin: 0 0 var(--space-md) 0;
+    color: var(--color-text-secondary);
 }
 
-/* Links */
 a {
-  color: var(--color-accent-primary) !important;
-  text-decoration: none;
-  transition: var(--transition);
+    color: var(--color-accent-primary);
+    text-decoration: none;
+    transition: var(--transition-fast);
 }
 
 a:hover {
-  color: var(--color-accent-light) !important;
+    color: var(--color-accent-hover);
+    text-decoration: underline;
 }
 
-/* Header */
+/*
+ * LAYOUT CONTAINERS
+ */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--space-md);
+}
+
+@media (min-width: 640px) {
+    .container {
+        padding: 0 var(--space-lg);
+    }
+}
+
+@media (min-width: 1024px) {
+    .container {
+        padding: 0 var(--space-xl);
+    }
+}
+
+/*
+ * HEADER
+ */
 header {
-  background: var(--color-bg-secondary) !important;
-  border-bottom: 1px solid var(--color-border) !important;
-  padding: 1rem 0;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+}
+
+.page-home header {
+    position: relative;
+    z-index: 1001;
 }
 
 .header-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-lg) 0;
+    gap: var(--space-lg);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
 }
 
 .logo {
-  font-family: var(--font-heading) !important;
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--color-text-primary) !important;
-}
-
-.logo a {
-  color: var(--color-text-primary) !important;
-  text-decoration: none;
+    font-size: var(--text-2xl);
+    font-weight: 800;
+    color: var(--color-text-primary);
+    text-decoration: none;
 }
 
 .tagline {
-  font-size: 0.9rem;
-  color: var(--color-text-muted) !important;
-  margin-left: 1rem;
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    display: none;
 }
 
-/* Navigation */
+@media (min-width: 768px) {
+    .tagline {
+        display: block;
+    }
+}
+
+/*
+ * NAVIGATION
+ */
 nav ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  gap: 0.5rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: var(--space-xs);
 }
 
 nav a {
-  display: block;
-  padding: 0.75rem 1rem;
-  border-radius: var(--border-radius);
-  color: var(--color-text-secondary) !important;
-  font-weight: 500;
-  transition: var(--transition);
+    display: block;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    font-size: var(--text-sm);
+    transition: var(--transition-fast);
+    text-decoration: none;
 }
 
-nav a:hover {
-  background: var(--color-bg-tertiary) !important;
-  color: var(--color-text-primary) !important;
+nav a:hover,
+nav a:focus {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+    text-decoration: none;
 }
 
-/* Main Content */
+/*
+ * MAIN CONTENT
+ */
 main {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
-  min-height: calc(100vh - 200px);
+    min-height: calc(100vh - 120px);
 }
 
-/* Forms and Inputs */
-input, textarea, select {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--border-radius);
-  color: var(--color-text-primary) !important;
-  padding: 0.75rem;
-  outline: none;
-  transition: var(--transition);
+.page-home main {
+    padding: 0;
+    margin: 0;
 }
 
-input:focus, textarea:focus, select:focus {
-  border-color: var(--color-accent-primary) !important;
-  box-shadow: 0 0 0 3px var(--color-accent-subtle) !important;
+main:not(.page-home main) {
+    padding: var(--space-xl) 0;
 }
 
-input::placeholder {
-  color: var(--color-text-muted) !important;
+/*
+ * HERO SECTION
+ */
+.hero-enhanced {
+    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
+    width: 100vw;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--color-bg-primary), var(--color-bg-secondary));
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
 }
 
-/* Buttons */
-.btn, button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  background: var(--color-bg-secondary) !important;
-  color: var(--color-text-secondary) !important;
-  font-family: var(--font-body);
-  font-weight: 500;
-  text-decoration: none;
-  transition: var(--transition);
-  cursor: pointer;
+.hero-bg-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
 }
 
-.btn:hover, button:hover {
-  background: var(--color-bg-tertiary) !important;
-  border-color: var(--color-border-hover);
-  color: var(--color-text-primary) !important;
+.hero-background-animated {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url('/static/images/supcourt-sg.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    filter: hue-rotate(180deg) brightness(0.7) contrast(1.2);
+    transition: opacity 1s ease-in-out;
+    transform: translateZ(0) scale(1.05);
+    backface-visibility: hidden;
 }
 
-.btn-primary {
-  background: var(--color-accent-primary) !important;
-  border-color: var(--color-accent-primary) !important;
-  color: var(--color-text-inverse) !important;
+.hero-background-animated.loading {
+    opacity: 0;
+    background-color: var(--color-bg-tertiary);
 }
 
-.btn-primary:hover {
-  background: var(--color-accent-hover) !important;
-  border-color: var(--color-accent-hover) !important;
+.hero-background-animated.loaded {
+    opacity: 0.3;
+    animation: heroFloat 25s ease-in-out infinite;
 }
 
-/* Cards */
+.hero-background-animated.error {
+    opacity: 0.2;
+    background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 50%, #2a2a2a 100%);
+}
+
+@keyframes heroFloat {
+    0%, 100% {
+        transform: translateZ(0) scale(1.05) translateY(0px);
+    }
+    25% {
+        transform: translateZ(0) scale(1.06) translateY(-15px);
+    }
+    50% {
+        transform: translateZ(0) scale(1.07) translateY(-10px);
+    }
+    75% {
+        transform: translateZ(0) scale(1.06) translateY(-20px);
+    }
+}
+
+.hero-overlay-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        135deg,
+        rgba(26, 26, 26, 0.85) 0%,
+        rgba(42, 42, 42, 0.7) 30%,
+        rgba(58, 58, 58, 0.6) 70%,
+        rgba(26, 26, 26, 0.9) 100%
+    );
+    z-index: 2;
+}
+
+.hero-content-wrapper {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 0 var(--space-xl);
+}
+
+.hero-glass-card {
+    background: rgba(26, 26, 26, 0.85);
+    backdrop-filter: blur(25px);
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    padding: var(--space-2xl) var(--space-3xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-glass-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-accent-magenta));
+    opacity: 0.8;
+}
+
+.hero-title-main {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    margin-bottom: var(--space-lg);
+    color: var(--color-text-primary);
+    text-shadow: 0 0 30px rgba(0, 212, 255, 0.4);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+}
+
+.hero-tagline-main {
+    font-size: clamp(1.1rem, 2.5vw, 1.4rem);
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-2xl);
+    line-height: 1.5;
+    font-weight: 400;
+}
+
+.hero-search-container {
+    margin-bottom: var(--space-xl);
+}
+
+.hero-search-form {
+    position: relative;
+    width: 100%;
+    max-width: 650px;
+    margin: 0 auto;
+}
+
+.hero-search-wrapper {
+    position: relative;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(0, 212, 255, 0.3);
+    border-radius: 25px;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+}
+
+.hero-search-wrapper:hover {
+    border-color: rgba(0, 212, 255, 0.5);
+    box-shadow: 0 0 25px rgba(0, 212, 255, 0.2);
+}
+
+.hero-search-wrapper:focus-within {
+    border-color: rgba(0, 212, 255, 0.8);
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+}
+
+.hero-search-input {
+    width: 100%;
+    min-width: 0;
+    flex: 1;
+    padding: 1.25rem 1.75rem;
+    background: transparent;
+    border: none;
+    color: var(--color-text-primary);
+    font-size: 1.1rem;
+    outline: none;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.4;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+.hero-search-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+}
+
+.hero-cta-group {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: var(--space-xl);
+}
+
+.cta-primary,
+.cta-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-md) var(--space-xl);
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.cta-primary {
+    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+    color: white;
+    border: none;
+    box-shadow: 0 4px 16px rgba(0, 212, 255, 0.3);
+}
+
+.cta-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 212, 255, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.cta-secondary {
+    background: transparent;
+    color: var(--color-accent-cyan);
+    border: 2px solid var(--color-accent-cyan);
+}
+
+.cta-secondary:hover {
+    background: rgba(0, 212, 255, 0.1);
+    transform: translateY(-1px);
+    color: var(--color-accent-cyan);
+    text-decoration: none;
+}
+
+.hero-features {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-xl);
+    flex-wrap: wrap;
+    opacity: 0.9;
+}
+
+.hero-feature {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.95rem;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.hero-feature-icon {
+    font-size: 1.1rem;
+}
+
+/*
+ * SECTION SPACING
+ */
+.section-spacer {
+    height: var(--space-3xl);
+    width: 100%;
+}
+
+.databases-section,
+.no-databases,
+.about-section,
+.api-section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--space-xl);
+}
+
+/*
+ * CARDS SYSTEM
+ */
 .card {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--border-radius-large);
-  padding: 2rem;
-  margin-bottom: 2rem;
-  transition: var(--transition);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-xl);
+    transition: var(--transition-base);
+    position: relative;
+    display: flex;
+    flex-direction: column;
 }
 
 .card:hover {
-  border-color: var(--color-border-hover) !important;
-  box-shadow: var(--shadow-medium);
+    border-color: rgba(0, 212, 255, 0.3);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
 }
 
-.card h2, .card h3 {
-  color: var(--color-text-primary) !important;
-  margin-top: 0;
+.card-header {
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--color-border);
 }
 
-/* Breadcrumbs */
+.card-title {
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--space-sm) 0;
+    line-height: 1.3;
+}
+
+.card-title a {
+    color: inherit;
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+.card-title a:hover {
+    color: var(--color-accent-cyan);
+    text-decoration: none;
+}
+
+.card-description {
+    font-size: var(--text-base);
+    color: var(--color-text-muted);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/*
+ * DATABASE CARDS
+ */
+.database-grid {
+    display: grid;
+    gap: var(--space-xl);
+    margin-top: var(--space-2xl);
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+    .database-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 1024px) {
+    .database-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.database-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    transition: var(--transition-base);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.database-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-accent-cyan);
+    box-shadow: 0 8px 25px rgba(0, 212, 255, 0.15);
+}
+
+.database-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-accent-magenta));
+    opacity: 0;
+    transition: var(--transition-base);
+}
+
+.database-card:hover::before {
+    opacity: 1;
+}
+
+.database-title {
+    font-size: var(--text-xl);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--space-md) 0;
+    text-decoration: none;
+    transition: var(--transition-fast);
+}
+
+.database-title:hover {
+    color: var(--color-accent-cyan);
+    text-decoration: none;
+}
+
+.database-meta {
+    display: flex;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+    flex-wrap: wrap;
+}
+
+.table-count,
+.database-size {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    font-weight: 500;
+}
+
+.database-description {
+    flex-grow: 1;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-lg);
+    line-height: 1.5;
+    font-size: var(--text-sm);
+}
+
+.database-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: auto;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/*
+ * BUTTONS
+ */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    padding: var(--space-sm) var(--space-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    transition: var(--transition-fast);
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 44px;
+    line-height: 1;
+}
+
+.btn:hover,
+.btn:focus {
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+    border-color: var(--color-accent-cyan);
+    text-decoration: none;
+    transform: translateY(-1px);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+    border-color: transparent;
+    color: white;
+    font-weight: 600;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-secondary {
+    background: transparent;
+    border-color: var(--color-border-hover);
+    color: var(--color-text-muted);
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-secondary);
+    border-color: var(--color-accent-cyan);
+}
+
+/*
+ * TABLES
+ */
+.table-wrapper {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    overflow: auto;
+    margin: var(--space-xl) 0;
+    box-shadow: var(--shadow-md);
+}
+
+table.rows-and-columns,
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-bg-secondary);
+    margin: 0;
+}
+
+table.rows-and-columns th,
+.table-wrapper table th {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+    padding: var(--space-sm) var(--space-md);
+    text-align: left;
+    font-weight: 600;
+    font-size: var(--text-sm);
+    border-bottom: 2px solid var(--color-border-hover);
+    border-right: 1px solid var(--color-border);
+}
+
+table.rows-and-columns th:last-child,
+.table-wrapper table th:last-child {
+    border-right: none;
+}
+
+table.rows-and-columns td,
+.table-wrapper table td {
+    padding: var(--space-sm) var(--space-md);
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+    vertical-align: top;
+    word-wrap: break-word;
+}
+
+table.rows-and-columns td:last-child,
+.table-wrapper table td:last-child {
+    border-right: none;
+}
+
+table.rows-and-columns tr:hover,
+.table-wrapper table tr:hover {
+    background: var(--color-bg-elevated);
+}
+
+table.rows-and-columns tr:hover td,
+.table-wrapper table tr:hover td {
+    color: var(--color-text-primary);
+}
+
+table.rows-and-columns a,
+.table-wrapper table a {
+    color: var(--color-accent-primary);
+}
+
+table.rows-and-columns a:hover,
+.table-wrapper table a:hover {
+    color: var(--color-accent-hover);
+}
+
+/*
+ * FORMS
+ */
+input, textarea, select {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    padding: var(--space-sm);
+    outline: none;
+    transition: var(--transition-base);
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+}
+
+input::placeholder {
+    color: var(--color-text-muted);
+}
+
+/*
+ * UTILITIES
+ */
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--space-xl);
+    margin: var(--space-xl) 0;
+}
+
+.feature {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-xl);
+    text-align: center;
+    transition: var(--transition-base);
+}
+
+.feature:hover {
+    border-color: rgba(0, 212, 255, 0.3);
+    transform: translateY(-2px);
+}
+
+.feature h3 {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-md) 0;
+    font-size: 1.1rem;
+}
+
+.feature p {
+    margin: 0;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    font-size: 0.9rem;
+}
+
+/*
+ * MOBILE RESPONSIVE
+ */
+@media (max-width: 768px) {
+    .hero-enhanced {
+        height: 100vh;
+        height: calc(var(--vh, 1vh) * 100);
+    }
+
+    .hero-glass-card {
+        padding: var(--space-xl) var(--space-lg);
+        border-radius: 20px;
+    }
+
+    .hero-search-wrapper {
+        border-radius: 20px;
+    }
+
+    .hero-search-input {
+        padding: var(--space-md) 1.25rem;
+        font-size: var(--text-base);
+    }
+
+    .hero-cta-group {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .cta-primary,
+    .cta-secondary {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+    }
+
+    .hero-features {
+        flex-direction: column;
+        gap: var(--space-md);
+        align-items: center;
+    }
+
+    .section-spacer {
+        height: var(--space-2xl);
+    }
+
+    .databases-section,
+    .no-databases,
+    .about-section,
+    .api-section {
+        padding: 0 var(--space-md);
+    }
+
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+        gap: var(--space-md);
+    }
+
+    .header-left {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+
+    nav ul {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .card,
+    .database-card {
+        padding: var(--space-lg);
+        margin-bottom: var(--space-lg);
+    }
+
+    .database-actions {
+        flex-direction: column;
+        gap: var(--space-xs);
+    }
+
+    .database-actions > * {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .table-wrapper {
+        margin: var(--space-lg) calc(-1 * var(--space-md));
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+    }
+
+    table.rows-and-columns,
+    .table-wrapper table {
+        min-width: 600px;
+    }
+
+    table.rows-and-columns th,
+    table.rows-and-columns td,
+    .table-wrapper table th,
+    .table-wrapper table td {
+        padding: var(--space-xs) var(--space-sm);
+        font-size: var(--text-xs);
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-lg);
+    }
+
+    .feature {
+        padding: var(--space-lg);
+    }
+}
+
+/*
+ * SQL EDITOR STYLES
+ */
+.sql-editor-container {
+    position: relative;
+}
+
+.sql-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: var(--z-dropdown);
+    display: none;
+}
+
+.suggestion-item {
+    padding: var(--space-sm);
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: var(--transition-fast);
+}
+
+.suggestion-item:hover {
+    background: rgba(0, 212, 255, 0.1);
+}
+
+.suggestion-category {
+    font-weight: 600;
+    color: var(--color-accent-cyan);
+    font-size: var(--text-sm);
+}
+
+.suggestion-description {
+    font-size: var(--text-xs);
+    color: var(--color-text-muted);
+    margin-top: var(--space-xs);
+}
+
+/*
+ * QUERY INTERFACE STYLES
+ */
+.query-header {
+    margin-bottom: var(--space-2xl);
+}
+
+.query-description {
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    margin-top: var(--space-md);
+}
+
+.sql-editor {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-2xl);
+}
+
+.editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    padding-bottom: var(--space-md);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.editor-controls {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+}
+
+.current-database {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    margin-right: var(--space-md);
+}
+
+.sql-textarea {
+    width: 100%;
+    min-height: 200px;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    padding: var(--space-md);
+    resize: vertical;
+    outline: none;
+    transition: var(--transition-base);
+}
+
+.sql-textarea:focus {
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+}
+
+.query-options {
+    display: flex;
+    gap: var(--space-lg);
+    margin: var(--space-lg) 0;
+    flex-wrap: wrap;
+}
+
+.option-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.option-group label {
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    font-weight: 500;
+}
+
+.query-actions {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-lg);
+    flex-wrap: wrap;
+}
+
+/*
+ * EXAMPLE QUERIES GRID
+ */
+.examples-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+.example-card {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    transition: var(--transition-base);
+}
+
+.example-card:hover {
+    border-color: rgba(0, 212, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.example-card h4 {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-md) 0;
+    font-size: var(--text-lg);
+}
+
+.example-card pre {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-md);
+    margin: var(--space-md) 0;
+    overflow-x: auto;
+}
+
+.example-card code {
+    color: var(--color-accent-cyan);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-sm);
+    line-height: 1.4;
+}
+
+/*
+ * RESULTS DISPLAY
+ */
+.query-results {
+    margin-top: var(--space-2xl);
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+    gap: var(--space-md);
+}
+
+.results-meta {
+    display: flex;
+    gap: var(--space-lg);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+.results-actions {
+    display: flex;
+    gap: var(--space-sm);
+}
+
+.query-results-table {
+    font-size: var(--text-sm);
+}
+
+.null-value {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.long-text summary {
+    cursor: pointer;
+    color: var(--color-accent-primary);
+}
+
+.full-text {
+    margin-top: var(--space-sm);
+    padding: var(--space-sm);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/*
+ * HELP SECTIONS
+ */
+.help-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-xl);
+    margin-top: var(--space-lg);
+}
+
+.help-section h4 {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-md) 0;
+}
+
+.help-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.help-section li {
+    padding: var(--space-xs) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--color-text-secondary);
+}
+
+.help-section li:last-child {
+    border-bottom: none;
+}
+
+.help-section code {
+    background: var(--color-bg-tertiary);
+    color: var(--color-accent-cyan);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-xs);
+}
+
+.help-section kbd {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-primary);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: var(--text-xs);
+}
+
+/*
+ * TABLE PAGE SPECIFIC STYLES
+ */
+.table-header {
+    margin-bottom: var(--space-2xl);
+}
+
+.table-overview {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.table-overview::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-accent-magenta));
+}
+
+.table-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+@media (min-width: 768px) {
+    .table-info {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
+.table-summary {
+    flex: 1;
+}
+
+.table-title {
+    font-size: var(--text-4xl);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--space-md) 0;
+    line-height: 1.2;
+}
+
+.table-subtitle {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-lg) 0;
+    line-height: 1.4;
+}
+
+.table-stats {
+    display: flex;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+}
+
+.table-actions-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-width: 250px;
+}
+
+@media (max-width: 767px) {
+    .table-actions-section {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+/*
+ * ROW PAGE SPECIFIC STYLES
+ */
+.row-header {
+    margin-bottom: var(--space-2xl);
+}
+
+.row-overview {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    margin-bottom: var(--space-xl);
+    position: relative;
+    overflow: hidden;
+}
+
+.row-overview::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-accent-magenta), var(--color-accent-cyan));
+}
+
+.row-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+@media (min-width: 768px) {
+    .row-info {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+}
+
+.row-summary {
+    flex: 1;
+}
+
+.row-title {
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--space-md) 0;
+    line-height: 1.2;
+}
+
+.row-subtitle {
+    font-size: var(--text-lg);
+    color: var(--color-text-muted);
+    margin: 0 0 var(--space-lg) 0;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+.row-stats {
+    display: flex;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+    flex-wrap: wrap;
+}
+
+.row-actions-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    min-width: 250px;
+}
+
+@media (max-width: 767px) {
+    .row-actions-section {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+/*
+ * COMMON COMPONENTS
+ */
 .breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 2rem;
-  font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xl);
+    font-size: var(--text-sm);
 }
 
 .breadcrumbs a {
-  color: var(--color-text-muted) !important;
+    color: var(--color-text-muted);
 }
 
 .breadcrumbs a:hover {
-  color: var(--color-accent-primary) !important;
+    color: var(--color-accent-primary);
 }
 
 .separator {
-  color: var(--color-text-muted) !important;
+    color: var(--color-text-muted);
 }
 
-/* Custom Zeeker Sections */
-.zeeker-custom {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--border-radius-large);
-  padding: 2rem;
-  margin: 2rem 0;
+.export-actions {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
-.table-header {
-  margin-bottom: 2rem;
-}
-
-.table-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-  flex-wrap: wrap;
+@media (max-width: 767px) {
+    .export-actions {
+        justify-content: center;
+    }
 }
 
 .tools-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
 }
 
 .tool {
-  background: var(--color-bg-tertiary) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: var(--border-radius);
-  padding: 1.5rem;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    transition: var(--transition-base);
+}
+
+.tool:hover {
+    border-color: rgba(0, 212, 255, 0.3);
+    transform: translateY(-1px);
 }
 
 .tool h3 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-  color: var(--color-accent-primary) !important;
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-sm) 0;
+    font-size: var(--text-lg);
 }
 
-/* Search form styling */
-.search-form input {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  color: var(--color-text-primary) !important;
-  padding: 0.75rem 1rem;
-  border-radius: var(--border-radius);
-  width: 100%;
-  max-width: 400px;
+.tool p {
+    margin: 0 0 var(--space-md) 0;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    font-size: var(--text-sm);
 }
 
-/* Code blocks */
-pre, code {
-  background: var(--color-bg-tertiary) !important;
-  color: var(--color-accent-light) !important;
-  border-radius: var(--border-radius);
-  font-family: var(--font-mono);
-}
-
-pre {
-  padding: 1rem;
-  overflow-x: auto;
-}
-
-code {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.9em;
-}
-
-/* Pagination */
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin: 2rem 0;
-}
-
-.pagination a {
-  background: var(--color-bg-secondary) !important;
-  border: 1px solid var(--color-border) !important;
-  color: var(--color-text-secondary) !important;
-  padding: 0.5rem 1rem;
-  border-radius: var(--border-radius);
-  transition: var(--transition);
-}
-
-.pagination a:hover {
-  background: var(--color-bg-tertiary) !important;
-  color: var(--color-text-primary) !important;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .header-content {
-    flex-direction: column;
-    gap: 1rem;
-    text-align: center;
-  }
-
-  .tagline {
-    margin-left: 0 !important;
-  }
-
-  nav ul {
-    justify-content: center;
+.export-options {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
     flex-wrap: wrap;
-  }
-
-  main {
-    padding: 1rem;
-  }
-
-  .table-actions {
-    justify-content: center;
-  }
-
-  .tools-grid {
-    grid-template-columns: 1fr;
-  }
-
-  /* Mobile table scrolling */
-  .table-wrapper {
-    overflow-x: auto;
-  }
-
-  table {
-    min-width: 600px;
-  }
 }
 
-/* EMERGENCY VISIBILITY FIXES */
-/* If nothing else works, these should force visibility */
-tbody tr {
-  background: var(--color-bg-secondary) !important;
-  color: var(--color-text-secondary) !important;
+.export-options .btn {
+    font-size: var(--text-xs);
+    padding: var(--space-xs) var(--space-sm);
+    min-height: 32px;
 }
 
-tbody td {
-  background: var(--color-bg-secondary) !important;
-  color: var(--color-text-secondary) !important;
-  padding: 0.75rem !important;
-  border: 1px solid var(--color-border) !important;
+/*
+ * ACCESSIBILITY & PERFORMANCE
+ */
+@media (prefers-reduced-motion: reduce) {
+    .hero-background-animated,
+    .hero-background-animated.loaded {
+        animation: none;
+        transform: translateZ(0) scale(1.05);
+    }
+
+    .card:hover,
+    .database-card:hover,
+    .feature:hover,
+    .cta-primary:hover,
+    .cta-secondary:hover,
+    .btn:hover,
+    .tool:hover,
+    .example-card:hover {
+        transform: none;
+    }
 }
 
-/* Force any hidden elements to be visible */
-table[style*="display: none"],
-tr[style*="display: none"],
-td[style*="display: none"] {
-  display: table !important;
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
-
-table tr[style*="visibility: hidden"],
-td[style*="visibility: hidden"] {
-  visibility: visible !important;
-}
-
-/* Override any opacity issues */
-table tr[style*="opacity: 0"],
-td[style*="opacity: 0"] {
-  opacity: 1 !important;
-}
-
-/* Final fallback - make EVERYTHING visible */
-table * {
-  color: var(--color-text-secondary) !important;
-  background: inherit !important;
-}
-
-/* Row/Record Page Styling */
-.row-header {
-  margin-bottom: 2rem;
-}
-
-.record-title {
-  font-size: 1.2rem;
-  color: var(--color-text-primary) !important;
-  background: var(--color-bg-tertiary);
-  padding: 1rem;
-  border-radius: var(--border-radius);
-  margin: 1rem 0;
-  border-left: 4px solid var(--color-accent-primary);
-  font-weight: 500;
-}
-
-.row-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  flex-wrap: wrap;
-}
-
-.row-tools {
-  margin-top: 2rem;
-}
-
-/* Distinguish between table and row pages */
-.page-table .table-header {
-  border-left: 4px solid var(--color-accent-primary);
-}
-
-.page-row .row-header {
-  border-left: 4px solid var(--color-accent-light);
-}
-
-/* Better styling for record data display */
-.row dt {
-  color: var(--color-text-primary) !important;
-  font-weight: 600;
-  background: var(--color-bg-tertiary);
-  padding: 0.5rem 1rem;
-  margin: 0;
-  border-radius: var(--border-radius) var(--border-radius) 0 0;
-}
-
-.row dd {
-  color: var(--color-text-secondary) !important;
-  background: var(--color-bg-secondary);
-  padding: 1rem;
-  margin: 0 0 1rem 0;
-  border-radius: 0 0 var(--border-radius) var(--border-radius);
-  border: 1px solid var(--color-border);
-  border-top: none;
-}
-
-/* Style the definition list for better readability */
-.row dl {
-  margin: 1rem 0;
-}
-
-/* Long text content in records */
-.row dd.long {
-  max-height: 200px;
-  overflow-y: auto;
-  line-height: 1.6;
-}
-
-/* JSON/code content in records */
-.row dd pre {
-  background: var(--color-bg-primary) !important;
-  color: var(--color-accent-light) !important;
-  padding: 1rem;
-  border-radius: var(--border-radius);
-  overflow-x: auto;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-/* Links in record data */
-.row dd a {
-  color: var(--color-accent-primary) !important;
-  word-break: break-all;
-}
-
-.row dd a:hover {
-  color: var(--color-accent-light) !important;
-  text-decoration: underline;
-}
-
-/* Responsive adjustments for record pages */
-@media (max-width: 768px) {
-  .row-actions {
-    justify-content: center;
-  }
-
-  .record-title {
-    font-size: 1rem;
-    padding: 0.75rem;
-  }
-
-  .row dd {
-    padding: 0.75rem;
-  }
-}
-
-/* Option 1: Full Viewport Background */
-.hero-fullscreen {
-  height: 100vh;
-  width: 100vw;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-left: calc(-50vw + 50%);
-  margin-right: calc(-50vw + 50%);
-  background: linear-gradient(135deg,
-    var(--color-bg-primary),
-    var(--color-bg-secondary)
-  );
-}
-
-.hero-background-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: url('/static/images/holographic-building.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  opacity: 0.25;
-  z-index: 1;
-  animation: heroBackgroundFloat 15s ease-in-out infinite;
-  filter: hue-rotate(180deg) brightness(1.2) contrast(1.1);
-}
-
-@keyframes heroBackgroundFloat {
-  0%, 100% {
-    transform: translateY(0px) scale(1);
-  }
-  50% {
-    transform: translateY(-20px) scale(1.02);
-  }
-}
-
-.hero-content-overlay {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-  max-width: 900px;
-  padding: 4rem 2rem;
-}
-
-.hero-content-overlay h1 {
-  font-size: clamp(3rem, 6vw, 5rem);
-  font-weight: 900;
-  margin-bottom: 2rem;
-  color: var(--color-text-primary);
-  text-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
-  letter-spacing: -0.02em;
-}
-
 </document_content>
 </document>
 </documents>
