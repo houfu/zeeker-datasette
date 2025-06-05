@@ -14,25 +14,35 @@ RUN apt-get update && apt-get install -y \
     gcc \
     libsqlite3-dev \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
-# COPY pyproject.toml uv.lock* ./
-COPY requirements.txt .
+COPY pyproject.toml uv.lock* ./
+
 # Install Python dependencies with uv (faster) but fallback to pip
 RUN if [ -f "uv.lock" ]; then \
         uv sync --frozen; \
     else \
         pip install --no-cache-dir -r requirements.txt; \
     fi
+
+# Copy all scripts (including enhanced asset management)
 COPY scripts/ ./scripts/
-COPY metadata.json .
+
+# Copy base templates, static files, and plugins
 COPY templates/ ./templates/
 COPY static/ ./static/
 COPY plugins/ ./plugins/
 
-# Create data directory
-RUN mkdir -p /data
+# Copy base metadata configuration
+COPY metadata.json .
+
+# Create directories for asset management
+RUN mkdir -p /data \
+    && mkdir -p /app/templates \
+    && mkdir -p /app/static/databases \
+    && mkdir -p /app/plugins
 
 # Environment variables
 ENV DATASETTE_DATABASE_DIR=/data
@@ -41,12 +51,18 @@ ENV DATASETTE_PLUGINS_DIR=/app/plugins
 ENV DATASETTE_STATIC_DIR=/app/static
 ENV DATASETTE_METADATA=/app/metadata.json
 
+# Note: S3_BUCKET and AWS credentials should be provided at runtime
+# S3_PREFIX is no longer needed with the simplified structure
+
 # Port for Datasette
 EXPOSE 8001
 
-# Entry point script
+# Entry point script (updated)
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
+
+# Make asset management scripts executable
+RUN chmod +x scripts/download_from_s3.py
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 </document_content>
@@ -292,6 +308,30 @@ exec datasette serve --host 0.0.0.0 --port 8001 \
 </document_content>
 </document>
 <document index="7">
+<source>./pyproject.toml</source>
+<document_content>
+[project]
+name = "zeeker-datasette"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "boto3>=1.28.0",
+    "click>=8.1.3",
+    "datasette-search-all>=1.1.4",
+    "datasette==0.65.1",
+    "python-dotenv>=1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-mock>=3.14.1",
+]
+
+</document_content>
+</document>
+<document index="8">
 <source>./requirements.txt</source>
 <document_content>
 datasette>=0.64.3
@@ -301,7 +341,580 @@ python-dotenv>=1.0.0
 datasette-search-all
 </document_content>
 </document>
-<document index="8">
+<document index="9">
+<source>./uv.lock</source>
+<document_content>
+version = 1
+revision = 2
+requires-python = ">=3.12"
+
+[[package]]
+name = "aiofiles"
+version = "24.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/03/a88171e277e8caa88a4c77808c20ebb04ba74cc4681bf1e9416c862de237/aiofiles-24.1.0.tar.gz", hash = "sha256:22a075c9e5a3810f0c2e48f3008c94d68c65d763b9b03857924c99e57355166c", size = 30247, upload-time = "2024-06-24T11:02:03.584Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/45/30bb92d442636f570cb5651bc661f52b610e2eec3f891a5dc3a4c3667db0/aiofiles-24.1.0-py3-none-any.whl", hash = "sha256:b4ec55f4195e3eb5d7abd1bf7e061763e864dd4954231fb8539a0ef8bb8260e5", size = 15896, upload-time = "2024-06-24T11:02:01.529Z" },
+]
+
+[[package]]
+name = "anyio"
+version = "4.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "idna" },
+    { name = "sniffio" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/95/7d/4c1bd541d4dffa1b52bd83fb8527089e097a106fc90b467a7313b105f840/anyio-4.9.0.tar.gz", hash = "sha256:673c0c244e15788651a4ff38710fea9675823028a6f08a5eda409e0c9840a028", size = 190949, upload-time = "2025-03-17T00:02:54.77Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a1/ee/48ca1a7c89ffec8b6a0c5d02b89c305671d5ffd8d3c94acf8b8c408575bb/anyio-4.9.0-py3-none-any.whl", hash = "sha256:9f76d541cad6e36af7beb62e978876f3b41e3e04f2c1fbf0884604c0a9c4d93c", size = 100916, upload-time = "2025-03-17T00:02:52.713Z" },
+]
+
+[[package]]
+name = "asgi-csrf"
+version = "0.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "itsdangerous" },
+    { name = "python-multipart" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0a/59/2b54a274b9c9cbe1c0edbe5d324925ffd88a31567fb50dc2138e0160bdef/asgi_csrf-0.11.tar.gz", hash = "sha256:e19a4f87d5af3feabde04c57921ee15510c3bfb0565627df9cb20bcb303282c2", size = 14044, upload-time = "2024-11-15T01:05:45.198Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/1c/5d954baaf144852a4762368b37c06202b277378ea412acc5565f69acc9e9/asgi_csrf-0.11-py3-none-any.whl", hash = "sha256:03ac140115f39d4295288a9adf74fdc6ae607f6ef44abee8466520458207242b", size = 11704, upload-time = "2024-11-15T01:05:43.483Z" },
+]
+
+[[package]]
+name = "asgiref"
+version = "3.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/29/38/b3395cc9ad1b56d2ddac9970bc8f4141312dbaec28bc7c218b0dfafd0f42/asgiref-3.8.1.tar.gz", hash = "sha256:c343bd80a0bec947a9860adb4c432ffa7db769836c64238fc34bdc3fec84d590", size = 35186, upload-time = "2024-03-22T14:39:36.863Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/39/e3/893e8757be2612e6c266d9bb58ad2e3651524b5b40cf56761e985a28b13e/asgiref-3.8.1-py3-none-any.whl", hash = "sha256:3e1e3ecc849832fe52ccf2cb6686b7a55f82bb1d6aee72a58826471390335e47", size = 23828, upload-time = "2024-03-22T14:39:34.521Z" },
+]
+
+[[package]]
+name = "boto3"
+version = "1.38.27"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "botocore" },
+    { name = "jmespath" },
+    { name = "s3transfer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e7/96/fc74d8521d2369dd8c412438401ff12e1350a1cd3eab5c758ed3dd5e5f82/boto3-1.38.27.tar.gz", hash = "sha256:94bd7fdd92d5701b362d4df100d21e28f8307a67ff56b6a8b0398119cf22f859", size = 111875, upload-time = "2025-05-30T19:32:41.352Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/43/8b/b2361188bd1e293eede1bc165e2461d390394f71ec0c8c21211c8dabf62c/boto3-1.38.27-py3-none-any.whl", hash = "sha256:95f5fe688795303a8a15e8b7e7f255cadab35eae459d00cc281a4fd77252ea80", size = 139938, upload-time = "2025-05-30T19:32:38.006Z" },
+]
+
+[[package]]
+name = "botocore"
+version = "1.38.27"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jmespath" },
+    { name = "python-dateutil" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/5e/67899214ad57f7f26af5bd776ac5eb583dc4ecf5c1e52e2cbfdc200e487a/botocore-1.38.27.tar.gz", hash = "sha256:9788f7efe974328a38cbade64cc0b1e67d27944b899f88cb786ae362973133b6", size = 13919963, upload-time = "2025-05-30T19:32:29.657Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/83/a753562020b69fa90cebc39e8af2c753b24dcdc74bee8355ee3f6cefdf34/botocore-1.38.27-py3-none-any.whl", hash = "sha256:a785d5e9a5eda88ad6ab9ed8b87d1f2ac409d0226bba6ff801c55359e94d91a8", size = 13580545, upload-time = "2025-05-30T19:32:26.712Z" },
+]
+
+[[package]]
+name = "certifi"
+version = "2025.4.26"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e8/9e/c05b3920a3b7d20d3d3310465f50348e5b3694f4f88c6daf736eef3024c4/certifi-2025.4.26.tar.gz", hash = "sha256:0a816057ea3cdefcef70270d2c515e4506bbc954f417fa5ade2021213bb8f0c6", size = 160705, upload-time = "2025-04-26T02:12:29.51Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/7e/3db2bd1b1f9e95f7cddca6d6e75e2f2bd9f51b1246e546d88addca0106bd/certifi-2025.4.26-py3-none-any.whl", hash = "sha256:30350364dfe371162649852c63336a15c70c6510c2ad5015b21c2345311805f3", size = 159618, upload-time = "2025-04-26T02:12:27.662Z" },
+]
+
+[[package]]
+name = "click"
+version = "8.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/60/6c/8ca2efa64cf75a977a0d7fac081354553ebe483345c734fb6b6515d96bbc/click-8.2.1.tar.gz", hash = "sha256:27c491cc05d968d271d5a1db13e3b5a184636d9d930f148c50b038f0d0646202", size = 286342, upload-time = "2025-05-20T23:19:49.832Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/85/32/10bb5764d90a8eee674e9dc6f4db6a0ab47c8c4d0d83c27f7c39ac415a4d/click-8.2.1-py3-none-any.whl", hash = "sha256:61a3265b914e850b85317d0b3109c7f8cd35a670f963866005d6ef1d5175a12b", size = 102215, upload-time = "2025-05-20T23:19:47.796Z" },
+]
+
+[[package]]
+name = "click-default-group"
+version = "1.2.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1d/ce/edb087fb53de63dad3b36408ca30368f438738098e668b78c87f93cd41df/click_default_group-1.2.4.tar.gz", hash = "sha256:eb3f3c99ec0d456ca6cd2a7f08f7d4e91771bef51b01bdd9580cc6450fe1251e", size = 3505, upload-time = "2023-08-04T07:54:58.425Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/1a/aff8bb287a4b1400f69e09a53bd65de96aa5cee5691925b38731c67fc695/click_default_group-1.2.4-py2.py3-none-any.whl", hash = "sha256:9b60486923720e7fc61731bdb32b617039aba820e22e1c88766b1125592eaa5f", size = 4123, upload-time = "2023-08-04T07:54:56.875Z" },
+]
+
+[[package]]
+name = "colorama"
+version = "0.4.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/53/6f443c9a4a8358a93a6792e2acffb9d9d5cb0a5cfd8802644b7b1c9a02e4/colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44", size = 27697, upload-time = "2022-10-25T02:36:22.414Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6", size = 25335, upload-time = "2022-10-25T02:36:20.889Z" },
+]
+
+[[package]]
+name = "datasette"
+version = "0.65.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiofiles" },
+    { name = "asgi-csrf" },
+    { name = "asgiref" },
+    { name = "click" },
+    { name = "click-default-group" },
+    { name = "flexcache" },
+    { name = "flexparser" },
+    { name = "httpx" },
+    { name = "hupper" },
+    { name = "itsdangerous" },
+    { name = "janus" },
+    { name = "jinja2" },
+    { name = "mergedeep" },
+    { name = "pip" },
+    { name = "platformdirs" },
+    { name = "pluggy" },
+    { name = "pyyaml" },
+    { name = "setuptools" },
+    { name = "typing-extensions" },
+    { name = "uvicorn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/db/94/e6408997861e9de3ec61fb8107efe9eaf70f765ad2cd4e20b552dd340899/datasette-0.65.1.tar.gz", hash = "sha256:d8be37ae6dafbfd8e510d49c0dc0fc6696081614d048a507eed86dd2ae433223", size = 409411, upload-time = "2024-11-29T01:18:13.219Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/f7/fc15b9ddc7a2cafe546f0e2696d71940d7604a128e2f903e98238c3435f7/datasette-0.65.1-py3-none-any.whl", hash = "sha256:ba7adf717ddcc24a2a8ac57890fffd384a2ebb909b342e4f731ba09eba764305", size = 396428, upload-time = "2024-11-29T01:18:11.269Z" },
+]
+
+[[package]]
+name = "datasette-search-all"
+version = "1.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "datasette" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/33/3d/2111599e89583f9415b8e1e89f4b57f2dd41833f95ab023ea54157c9e636/datasette_search_all-1.1.4.tar.gz", hash = "sha256:371de80eff4f2f0e5ba70cc8efcdd68c1089ebf03d743febced250012d678911", size = 10885, upload-time = "2024-09-06T03:11:56.932Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/57/3d7535970622b175527e1fc270db0c193df8008ab56c2b8e628a373cdafe/datasette_search_all-1.1.4-py3-none-any.whl", hash = "sha256:8590099131899f5cb9d51d90a857ed3a828a5d8e2003fd3f0f5939a1a6bc7a8d", size = 10640, upload-time = "2024-09-06T03:11:55.455Z" },
+]
+
+[[package]]
+name = "flexcache"
+version = "0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/55/b0/8a21e330561c65653d010ef112bf38f60890051d244ede197ddaa08e50c1/flexcache-0.3.tar.gz", hash = "sha256:18743bd5a0621bfe2cf8d519e4c3bfdf57a269c15d1ced3fb4b64e0ff4600656", size = 15816, upload-time = "2024-03-09T03:21:07.555Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/cd/c883e1a7c447479d6e13985565080e3fea88ab5a107c21684c813dba1875/flexcache-0.3-py3-none-any.whl", hash = "sha256:d43c9fea82336af6e0115e308d9d33a185390b8346a017564611f1466dcd2e32", size = 13263, upload-time = "2024-03-09T03:21:05.635Z" },
+]
+
+[[package]]
+name = "flexparser"
+version = "0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/82/99/b4de7e39e8eaf8207ba1a8fa2241dd98b2ba72ae6e16960d8351736d8702/flexparser-0.4.tar.gz", hash = "sha256:266d98905595be2ccc5da964fe0a2c3526fbbffdc45b65b3146d75db992ef6b2", size = 31799, upload-time = "2024-11-07T02:00:56.249Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/5e/3be305568fe5f34448807976dc82fc151d76c3e0e03958f34770286278c1/flexparser-0.4-py3-none-any.whl", hash = "sha256:3738b456192dcb3e15620f324c447721023c0293f6af9955b481e91d00179846", size = 27625, upload-time = "2024-11-07T02:00:54.523Z" },
+]
+
+[[package]]
+name = "h11"
+version = "0.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/01/ee/02a2c011bdab74c6fb3c75474d40b3052059d95df7e73351460c8588d963/h11-0.16.0.tar.gz", hash = "sha256:4e35b956cf45792e4caa5885e69fba00bdbc6ffafbfa020300e549b208ee5ff1", size = 101250, upload-time = "2025-04-24T03:35:25.427Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl", hash = "sha256:63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86", size = 37515, upload-time = "2025-04-24T03:35:24.344Z" },
+]
+
+[[package]]
+name = "httpcore"
+version = "1.0.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/94/82699a10bca87a5556c9c59b5963f2d039dbd239f25bc2a63907a05a14cb/httpcore-1.0.9.tar.gz", hash = "sha256:6e34463af53fd2ab5d807f399a9b45ea31c3dfa2276f15a2c3f00afff6e176e8", size = 85484, upload-time = "2025-04-24T22:06:22.219Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/f5/f66802a942d491edb555dd61e3a9961140fd64c90bce1eafd741609d334d/httpcore-1.0.9-py3-none-any.whl", hash = "sha256:2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55", size = 78784, upload-time = "2025-04-24T22:06:20.566Z" },
+]
+
+[[package]]
+name = "httpx"
+version = "0.28.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "certifi" },
+    { name = "httpcore" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b1/df/48c586a5fe32a0f01324ee087459e112ebb7224f646c0b5023f5e79e9956/httpx-0.28.1.tar.gz", hash = "sha256:75e98c5f16b0f35b567856f597f06ff2270a374470a5c2392242528e3e3e42fc", size = 141406, upload-time = "2024-12-06T15:37:23.222Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/39/e50c7c3a983047577ee07d2a9e53faf5a69493943ec3f6a384bdc792deb2/httpx-0.28.1-py3-none-any.whl", hash = "sha256:d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad", size = 73517, upload-time = "2024-12-06T15:37:21.509Z" },
+]
+
+[[package]]
+name = "hupper"
+version = "1.12.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bd/e6/bb064537288eee2be97f3e0fcad8e7242bc5bbe9664ae57c7d29b3fa18c2/hupper-1.12.1.tar.gz", hash = "sha256:06bf54170ff4ecf4c84ad5f188dee3901173ab449c2608ad05b9bfd6b13e32eb", size = 43231, upload-time = "2024-01-26T09:14:57.294Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/7d/3888833e4f5ea56af4a9935066ec09a83228e533d7b8877f65889d706ee4/hupper-1.12.1-py3-none-any.whl", hash = "sha256:e872b959f09d90be5fb615bd2e62de89a0b57efc037bdf9637fb09cdf8552b19", size = 22830, upload-time = "2024-01-26T09:14:55.176Z" },
+]
+
+[[package]]
+name = "idna"
+version = "3.10"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490, upload-time = "2024-09-15T18:07:39.745Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442, upload-time = "2024-09-15T18:07:37.964Z" },
+]
+
+[[package]]
+name = "iniconfig"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz", hash = "sha256:3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7", size = 4793, upload-time = "2025-03-19T20:09:59.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl", hash = "sha256:9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760", size = 6050, upload-time = "2025-03-19T20:10:01.071Z" },
+]
+
+[[package]]
+name = "itsdangerous"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/cb/8ac0172223afbccb63986cc25049b154ecfb5e85932587206f42317be31d/itsdangerous-2.2.0.tar.gz", hash = "sha256:e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173", size = 54410, upload-time = "2024-04-16T21:28:15.614Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/96/92447566d16df59b2a776c0fb82dbc4d9e07cd95062562af01e408583fc4/itsdangerous-2.2.0-py3-none-any.whl", hash = "sha256:c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef", size = 16234, upload-time = "2024-04-16T21:28:14.499Z" },
+]
+
+[[package]]
+name = "janus"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/7f/69884b6618be4baf6ebcacc716ee8680a842428a19f403db6d1c0bb990aa/janus-2.0.0.tar.gz", hash = "sha256:0970f38e0e725400496c834a368a67ee551dc3b5ad0a257e132f5b46f2e77770", size = 22910, upload-time = "2024-12-13T12:59:08.622Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/34/65604740edcb20e1bda6a890348ed7d282e7dd23aa00401cbe36fd0edbd9/janus-2.0.0-py3-none-any.whl", hash = "sha256:7e6449d34eab04cd016befbd7d8c0d8acaaaab67cb59e076a69149f9031745f9", size = 12161, upload-time = "2024-12-13T12:59:06.106Z" },
+]
+
+[[package]]
+name = "jinja2"
+version = "3.1.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/df/bf/f7da0350254c0ed7c72f3e33cef02e048281fec7ecec5f032d4aac52226b/jinja2-3.1.6.tar.gz", hash = "sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d", size = 245115, upload-time = "2025-03-05T20:05:02.478Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl", hash = "sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67", size = 134899, upload-time = "2025-03-05T20:05:00.369Z" },
+]
+
+[[package]]
+name = "jmespath"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/2a/e867e8531cf3e36b41201936b7fa7ba7b5702dbef42922193f05c8976cd6/jmespath-1.0.1.tar.gz", hash = "sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe", size = 25843, upload-time = "2022-06-17T18:00:12.224Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/31/b4/b9b800c45527aadd64d5b442f9b932b00648617eb5d63d2c7a6587b7cafc/jmespath-1.0.1-py3-none-any.whl", hash = "sha256:02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980", size = 20256, upload-time = "2022-06-17T18:00:10.251Z" },
+]
+
+[[package]]
+name = "markupsafe"
+version = "3.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b2/97/5d42485e71dfc078108a86d6de8fa46db44a1a9295e89c5d6d4a06e23a62/markupsafe-3.0.2.tar.gz", hash = "sha256:ee55d3edf80167e48ea11a923c7386f4669df67d7994554387f84e7d8b0a2bf0", size = 20537, upload-time = "2024-10-18T15:21:54.129Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/22/09/d1f21434c97fc42f09d290cbb6350d44eb12f09cc62c9476effdb33a18aa/MarkupSafe-3.0.2-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:9778bd8ab0a994ebf6f84c2b949e65736d5575320a17ae8984a77fab08db94cf", size = 14274, upload-time = "2024-10-18T15:21:13.777Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/b0/18f76bba336fa5aecf79d45dcd6c806c280ec44538b3c13671d49099fdd0/MarkupSafe-3.0.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:846ade7b71e3536c4e56b386c2a47adf5741d2d8b94ec9dc3e92e5e1ee1e2225", size = 12348, upload-time = "2024-10-18T15:21:14.822Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/25/dd5c0f6ac1311e9b40f4af06c78efde0f3b5cbf02502f8ef9501294c425b/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1c99d261bd2d5f6b59325c92c73df481e05e57f19837bdca8413b9eac4bd8028", size = 24149, upload-time = "2024-10-18T15:21:15.642Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/f0/89e7aadfb3749d0f52234a0c8c7867877876e0a20b60e2188e9850794c17/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e17c96c14e19278594aa4841ec148115f9c7615a47382ecb6b82bd8fea3ab0c8", size = 23118, upload-time = "2024-10-18T15:21:17.133Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/da/f2eeb64c723f5e3777bc081da884b414671982008c47dcc1873d81f625b6/MarkupSafe-3.0.2-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:88416bd1e65dcea10bc7569faacb2c20ce071dd1f87539ca2ab364bf6231393c", size = 22993, upload-time = "2024-10-18T15:21:18.064Z" },
+    { url = "https://files.pythonhosted.org/packages/da/0e/1f32af846df486dce7c227fe0f2398dc7e2e51d4a370508281f3c1c5cddc/MarkupSafe-3.0.2-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:2181e67807fc2fa785d0592dc2d6206c019b9502410671cc905d132a92866557", size = 24178, upload-time = "2024-10-18T15:21:18.859Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/f6/bb3ca0532de8086cbff5f06d137064c8410d10779c4c127e0e47d17c0b71/MarkupSafe-3.0.2-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:52305740fe773d09cffb16f8ed0427942901f00adedac82ec8b67752f58a1b22", size = 23319, upload-time = "2024-10-18T15:21:19.671Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/82/8be4c96ffee03c5b4a034e60a31294daf481e12c7c43ab8e34a1453ee48b/MarkupSafe-3.0.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:ad10d3ded218f1039f11a75f8091880239651b52e9bb592ca27de44eed242a48", size = 23352, upload-time = "2024-10-18T15:21:20.971Z" },
+    { url = "https://files.pythonhosted.org/packages/51/ae/97827349d3fcffee7e184bdf7f41cd6b88d9919c80f0263ba7acd1bbcb18/MarkupSafe-3.0.2-cp312-cp312-win32.whl", hash = "sha256:0f4ca02bea9a23221c0182836703cbf8930c5e9454bacce27e767509fa286a30", size = 15097, upload-time = "2024-10-18T15:21:22.646Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/80/a61f99dc3a936413c3ee4e1eecac96c0da5ed07ad56fd975f1a9da5bc630/MarkupSafe-3.0.2-cp312-cp312-win_amd64.whl", hash = "sha256:8e06879fc22a25ca47312fbe7c8264eb0b662f6db27cb2d3bbbc74b1df4b9b87", size = 15601, upload-time = "2024-10-18T15:21:23.499Z" },
+    { url = "https://files.pythonhosted.org/packages/83/0e/67eb10a7ecc77a0c2bbe2b0235765b98d164d81600746914bebada795e97/MarkupSafe-3.0.2-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:ba9527cdd4c926ed0760bc301f6728ef34d841f405abf9d4f959c478421e4efd", size = 14274, upload-time = "2024-10-18T15:21:24.577Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/6d/9409f3684d3335375d04e5f05744dfe7e9f120062c9857df4ab490a1031a/MarkupSafe-3.0.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:f8b3d067f2e40fe93e1ccdd6b2e1d16c43140e76f02fb1319a05cf2b79d99430", size = 12352, upload-time = "2024-10-18T15:21:25.382Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/f5/6eadfcd3885ea85fe2a7c128315cc1bb7241e1987443d78c8fe712d03091/MarkupSafe-3.0.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:569511d3b58c8791ab4c2e1285575265991e6d8f8700c7be0e88f86cb0672094", size = 24122, upload-time = "2024-10-18T15:21:26.199Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/91/96cf928db8236f1bfab6ce15ad070dfdd02ed88261c2afafd4b43575e9e9/MarkupSafe-3.0.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:15ab75ef81add55874e7ab7055e9c397312385bd9ced94920f2802310c930396", size = 23085, upload-time = "2024-10-18T15:21:27.029Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/cf/c9d56af24d56ea04daae7ac0940232d31d5a8354f2b457c6d856b2057d69/MarkupSafe-3.0.2-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:f3818cb119498c0678015754eba762e0d61e5b52d34c8b13d770f0719f7b1d79", size = 22978, upload-time = "2024-10-18T15:21:27.846Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/9f/8619835cd6a711d6272d62abb78c033bda638fdc54c4e7f4272cf1c0962b/MarkupSafe-3.0.2-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:cdb82a876c47801bb54a690c5ae105a46b392ac6099881cdfb9f6e95e4014c6a", size = 24208, upload-time = "2024-10-18T15:21:28.744Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/bf/176950a1792b2cd2102b8ffeb5133e1ed984547b75db47c25a67d3359f77/MarkupSafe-3.0.2-cp313-cp313-musllinux_1_2_i686.whl", hash = "sha256:cabc348d87e913db6ab4aa100f01b08f481097838bdddf7c7a84b7575b7309ca", size = 23357, upload-time = "2024-10-18T15:21:29.545Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/4f/9a02c1d335caabe5c4efb90e1b6e8ee944aa245c1aaaab8e8a618987d816/MarkupSafe-3.0.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:444dcda765c8a838eaae23112db52f1efaf750daddb2d9ca300bcae1039adc5c", size = 23344, upload-time = "2024-10-18T15:21:30.366Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/55/c271b57db36f748f0e04a759ace9f8f759ccf22b4960c270c78a394f58be/MarkupSafe-3.0.2-cp313-cp313-win32.whl", hash = "sha256:bcf3e58998965654fdaff38e58584d8937aa3096ab5354d493c77d1fdd66d7a1", size = 15101, upload-time = "2024-10-18T15:21:31.207Z" },
+    { url = "https://files.pythonhosted.org/packages/29/88/07df22d2dd4df40aba9f3e402e6dc1b8ee86297dddbad4872bd5e7b0094f/MarkupSafe-3.0.2-cp313-cp313-win_amd64.whl", hash = "sha256:e6a2a455bd412959b57a172ce6328d2dd1f01cb2135efda2e4576e8a23fa3b0f", size = 15603, upload-time = "2024-10-18T15:21:32.032Z" },
+    { url = "https://files.pythonhosted.org/packages/62/6a/8b89d24db2d32d433dffcd6a8779159da109842434f1dd2f6e71f32f738c/MarkupSafe-3.0.2-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:b5a6b3ada725cea8a5e634536b1b01c30bcdcd7f9c6fff4151548d5bf6b3a36c", size = 14510, upload-time = "2024-10-18T15:21:33.625Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/06/a10f955f70a2e5a9bf78d11a161029d278eeacbd35ef806c3fd17b13060d/MarkupSafe-3.0.2-cp313-cp313t-macosx_11_0_arm64.whl", hash = "sha256:a904af0a6162c73e3edcb969eeeb53a63ceeb5d8cf642fade7d39e7963a22ddb", size = 12486, upload-time = "2024-10-18T15:21:34.611Z" },
+    { url = "https://files.pythonhosted.org/packages/34/cf/65d4a571869a1a9078198ca28f39fba5fbb910f952f9dbc5220afff9f5e6/MarkupSafe-3.0.2-cp313-cp313t-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4aa4e5faecf353ed117801a068ebab7b7e09ffb6e1d5e412dc852e0da018126c", size = 25480, upload-time = "2024-10-18T15:21:35.398Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/e3/90e9651924c430b885468b56b3d597cabf6d72be4b24a0acd1fa0e12af67/MarkupSafe-3.0.2-cp313-cp313t-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c0ef13eaeee5b615fb07c9a7dadb38eac06a0608b41570d8ade51c56539e509d", size = 23914, upload-time = "2024-10-18T15:21:36.231Z" },
+    { url = "https://files.pythonhosted.org/packages/66/8c/6c7cf61f95d63bb866db39085150df1f2a5bd3335298f14a66b48e92659c/MarkupSafe-3.0.2-cp313-cp313t-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:d16a81a06776313e817c951135cf7340a3e91e8c1ff2fac444cfd75fffa04afe", size = 23796, upload-time = "2024-10-18T15:21:37.073Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/35/cbe9238ec3f47ac9a7c8b3df7a808e7cb50fe149dc7039f5f454b3fba218/MarkupSafe-3.0.2-cp313-cp313t-musllinux_1_2_aarch64.whl", hash = "sha256:6381026f158fdb7c72a168278597a5e3a5222e83ea18f543112b2662a9b699c5", size = 25473, upload-time = "2024-10-18T15:21:37.932Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/32/7621a4382488aa283cc05e8984a9c219abad3bca087be9ec77e89939ded9/MarkupSafe-3.0.2-cp313-cp313t-musllinux_1_2_i686.whl", hash = "sha256:3d79d162e7be8f996986c064d1c7c817f6df3a77fe3d6859f6f9e7be4b8c213a", size = 24114, upload-time = "2024-10-18T15:21:39.799Z" },
+    { url = "https://files.pythonhosted.org/packages/0d/80/0985960e4b89922cb5a0bac0ed39c5b96cbc1a536a99f30e8c220a996ed9/MarkupSafe-3.0.2-cp313-cp313t-musllinux_1_2_x86_64.whl", hash = "sha256:131a3c7689c85f5ad20f9f6fb1b866f402c445b220c19fe4308c0b147ccd2ad9", size = 24098, upload-time = "2024-10-18T15:21:40.813Z" },
+    { url = "https://files.pythonhosted.org/packages/82/78/fedb03c7d5380df2427038ec8d973587e90561b2d90cd472ce9254cf348b/MarkupSafe-3.0.2-cp313-cp313t-win32.whl", hash = "sha256:ba8062ed2cf21c07a9e295d5b8a2a5ce678b913b45fdf68c32d95d6c1291e0b6", size = 15208, upload-time = "2024-10-18T15:21:41.814Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/65/6079a46068dfceaeabb5dcad6d674f5f5c61a6fa5673746f42a9f4c233b3/MarkupSafe-3.0.2-cp313-cp313t-win_amd64.whl", hash = "sha256:e444a31f8db13eb18ada366ab3cf45fd4b31e4db1236a4448f68778c1d1a5a2f", size = 15739, upload-time = "2024-10-18T15:21:42.784Z" },
+]
+
+[[package]]
+name = "mergedeep"
+version = "1.3.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/41/580bb4006e3ed0361b8151a01d324fb03f420815446c7def45d02f74c270/mergedeep-1.3.4.tar.gz", hash = "sha256:0096d52e9dad9939c3d975a774666af186eda617e6ca84df4c94dec30004f2a8", size = 4661, upload-time = "2021-02-05T18:55:30.623Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2c/19/04f9b178c2d8a15b076c8b5140708fa6ffc5601fb6f1e975537072df5b2a/mergedeep-1.3.4-py3-none-any.whl", hash = "sha256:70775750742b25c0d8f36c55aed03d24c3384d17c951b3175d898bd778ef0307", size = 6354, upload-time = "2021-02-05T18:55:29.583Z" },
+]
+
+[[package]]
+name = "packaging"
+version = "25.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/d4/1fc4078c65507b51b96ca8f8c3ba19e6a61c8253c72794544580a7b6c24d/packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f", size = 165727, upload-time = "2025-04-19T11:48:59.673Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484", size = 66469, upload-time = "2025-04-19T11:48:57.875Z" },
+]
+
+[[package]]
+name = "pip"
+version = "25.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/de/241caa0ca606f2ec5fe0c1f4261b0465df78d786a38da693864a116c37f4/pip-25.1.1.tar.gz", hash = "sha256:3de45d411d308d5054c2168185d8da7f9a2cd753dbac8acbfa88a8909ecd9077", size = 1940155, upload-time = "2025-05-02T15:14:02.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/a2/d40fb2460e883eca5199c62cfc2463fd261f760556ae6290f88488c362c0/pip-25.1.1-py3-none-any.whl", hash = "sha256:2913a38a2abf4ea6b64ab507bd9e967f3b53dc1ede74b01b0931e1ce548751af", size = 1825227, upload-time = "2025-05-02T15:13:59.102Z" },
+]
+
+[[package]]
+name = "platformdirs"
+version = "4.3.8"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fe/8b/3c73abc9c759ecd3f1f7ceff6685840859e8070c4d947c93fae71f6a0bf2/platformdirs-4.3.8.tar.gz", hash = "sha256:3d512d96e16bcb959a814c9f348431070822a6496326a4be0911c40b5a74c2bc", size = 21362, upload-time = "2025-05-07T22:47:42.121Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/39/979e8e21520d4e47a0bbe349e2713c0aac6f3d853d0e5b34d76206c439aa/platformdirs-4.3.8-py3-none-any.whl", hash = "sha256:ff7059bb7eb1179e2685604f4aaf157cfd9535242bd23742eadc3c13542139b4", size = 18567, upload-time = "2025-05-07T22:47:40.376Z" },
+]
+
+[[package]]
+name = "pluggy"
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz", hash = "sha256:7dcc130b76258d33b90f61b658791dede3486c3e6bfb003ee5c9bfb396dd22f3", size = 69412, upload-time = "2025-05-15T12:30:07.975Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl", hash = "sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746", size = 20538, upload-time = "2025-05-15T12:30:06.134Z" },
+]
+
+[[package]]
+name = "pygments"
+version = "2.19.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7c/2d/c3338d48ea6cc0feb8446d8e6937e1408088a72a39937982cc6111d17f84/pygments-2.19.1.tar.gz", hash = "sha256:61c16d2a8576dc0649d9f39e089b5f02bcd27fba10d8fb4dcc28173f7a45151f", size = 4968581, upload-time = "2025-01-06T17:26:30.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/0b/9fcc47d19c48b59121088dd6da2488a49d5f72dacf8262e2790a1d2c7d15/pygments-2.19.1-py3-none-any.whl", hash = "sha256:9ea1544ad55cecf4b8242fab6dd35a93bbce657034b0611ee383099054ab6d8c", size = 1225293, upload-time = "2025-01-06T17:26:25.553Z" },
+]
+
+[[package]]
+name = "pytest"
+version = "8.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+    { name = "iniconfig" },
+    { name = "packaging" },
+    { name = "pluggy" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fb/aa/405082ce2749be5398045152251ac69c0f3578c7077efc53431303af97ce/pytest-8.4.0.tar.gz", hash = "sha256:14d920b48472ea0dbf68e45b96cd1ffda4705f33307dcc86c676c1b5104838a6", size = 1515232, upload-time = "2025-06-02T17:36:30.03Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2f/de/afa024cbe022b1b318a3d224125aa24939e99b4ff6f22e0ba639a2eaee47/pytest-8.4.0-py3-none-any.whl", hash = "sha256:f40f825768ad76c0977cbacdf1fd37c6f7a468e460ea6a0636078f8972d4517e", size = 363797, upload-time = "2025-06-02T17:36:27.859Z" },
+]
+
+[[package]]
+name = "pytest-mock"
+version = "3.14.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/71/28/67172c96ba684058a4d24ffe144d64783d2a270d0af0d9e792737bddc75c/pytest_mock-3.14.1.tar.gz", hash = "sha256:159e9edac4c451ce77a5cdb9fc5d1100708d2dd4ba3c3df572f14097351af80e", size = 33241, upload-time = "2025-05-26T13:58:45.167Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b2/05/77b60e520511c53d1c1ca75f1930c7dd8e971d0c4379b7f4b3f9644685ba/pytest_mock-3.14.1-py3-none-any.whl", hash = "sha256:178aefcd11307d874b4cd3100344e7e2d888d9791a6a1d9bfe90fbc1b74fd1d0", size = 9923, upload-time = "2025-05-26T13:58:43.487Z" },
+]
+
+[[package]]
+name = "python-dateutil"
+version = "2.9.0.post0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/66/c0/0c8b6ad9f17a802ee498c46e004a0eb49bc148f2fd230864601a86dcf6db/python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3", size = 342432, upload-time = "2024-03-01T18:36:20.211Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427", size = 229892, upload-time = "2024-03-01T18:36:18.57Z" },
+]
+
+[[package]]
+name = "python-dotenv"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/88/2c/7bb1416c5620485aa793f2de31d3df393d3686aa8a8506d11e10e13c5baf/python_dotenv-1.1.0.tar.gz", hash = "sha256:41f90bc6f5f177fb41f53e87666db362025010eb28f60a01c9143bfa33a2b2d5", size = 39920, upload-time = "2025-03-25T10:14:56.835Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/18/98a99ad95133c6a6e2005fe89faedf294a748bd5dc803008059409ac9b1e/python_dotenv-1.1.0-py3-none-any.whl", hash = "sha256:d7c01d9e2293916c18baf562d95698754b0dbbb5e74d457c45d4f6561fb9d55d", size = 20256, upload-time = "2025-03-25T10:14:55.034Z" },
+]
+
+[[package]]
+name = "python-multipart"
+version = "0.0.20"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/87/f44d7c9f274c7ee665a29b885ec97089ec5dc034c7f3fafa03da9e39a09e/python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13", size = 37158, upload-time = "2024-12-16T19:45:46.972Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/58/38b5afbc1a800eeea951b9285d3912613f2603bdf897a4ab0f4bd7f405fc/python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104", size = 24546, upload-time = "2024-12-16T19:45:44.423Z" },
+]
+
+[[package]]
+name = "pyyaml"
+version = "6.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/ed/79a089b6be93607fa5cdaedf301d7dfb23af5f25c398d5ead2525b063e17/pyyaml-6.0.2.tar.gz", hash = "sha256:d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e", size = 130631, upload-time = "2024-08-06T20:33:50.674Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/0c/c581167fc46d6d6d7ddcfb8c843a4de25bdd27e4466938109ca68492292c/PyYAML-6.0.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:c70c95198c015b85feafc136515252a261a84561b7b1d51e3384e0655ddf25ab", size = 183873, upload-time = "2024-08-06T20:32:25.131Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/0c/38374f5bb272c051e2a69281d71cba6fdb983413e6758b84482905e29a5d/PyYAML-6.0.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:ce826d6ef20b1bc864f0a68340c8b3287705cae2f8b4b1d932177dcc76721725", size = 173302, upload-time = "2024-08-06T20:32:26.511Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/93/9916574aa8c00aa06bbac729972eb1071d002b8e158bd0e83a3b9a20a1f7/PyYAML-6.0.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:1f71ea527786de97d1a0cc0eacd1defc0985dcf6b3f17bb77dcfc8c34bec4dc5", size = 739154, upload-time = "2024-08-06T20:32:28.363Z" },
+    { url = "https://files.pythonhosted.org/packages/95/0f/b8938f1cbd09739c6da569d172531567dbcc9789e0029aa070856f123984/PyYAML-6.0.2-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:9b22676e8097e9e22e36d6b7bda33190d0d400f345f23d4065d48f4ca7ae0425", size = 766223, upload-time = "2024-08-06T20:32:30.058Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/2b/614b4752f2e127db5cc206abc23a8c19678e92b23c3db30fc86ab731d3bd/PyYAML-6.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:80bab7bfc629882493af4aa31a4cfa43a4c57c83813253626916b8c7ada83476", size = 767542, upload-time = "2024-08-06T20:32:31.881Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/00/dd137d5bcc7efea1836d6264f049359861cf548469d18da90cd8216cf05f/PyYAML-6.0.2-cp312-cp312-musllinux_1_1_aarch64.whl", hash = "sha256:0833f8694549e586547b576dcfaba4a6b55b9e96098b36cdc7ebefe667dfed48", size = 731164, upload-time = "2024-08-06T20:32:37.083Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/1f/4f998c900485e5c0ef43838363ba4a9723ac0ad73a9dc42068b12aaba4e4/PyYAML-6.0.2-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:8b9c7197f7cb2738065c481a0461e50ad02f18c78cd75775628afb4d7137fb3b", size = 756611, upload-time = "2024-08-06T20:32:38.898Z" },
+    { url = "https://files.pythonhosted.org/packages/df/d1/f5a275fdb252768b7a11ec63585bc38d0e87c9e05668a139fea92b80634c/PyYAML-6.0.2-cp312-cp312-win32.whl", hash = "sha256:ef6107725bd54b262d6dedcc2af448a266975032bc85ef0172c5f059da6325b4", size = 140591, upload-time = "2024-08-06T20:32:40.241Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/e8/4f648c598b17c3d06e8753d7d13d57542b30d56e6c2dedf9c331ae56312e/PyYAML-6.0.2-cp312-cp312-win_amd64.whl", hash = "sha256:7e7401d0de89a9a855c839bc697c079a4af81cf878373abd7dc625847d25cbd8", size = 156338, upload-time = "2024-08-06T20:32:41.93Z" },
+    { url = "https://files.pythonhosted.org/packages/ef/e3/3af305b830494fa85d95f6d95ef7fa73f2ee1cc8ef5b495c7c3269fb835f/PyYAML-6.0.2-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:efdca5630322a10774e8e98e1af481aad470dd62c3170801852d752aa7a783ba", size = 181309, upload-time = "2024-08-06T20:32:43.4Z" },
+    { url = "https://files.pythonhosted.org/packages/45/9f/3b1c20a0b7a3200524eb0076cc027a970d320bd3a6592873c85c92a08731/PyYAML-6.0.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:50187695423ffe49e2deacb8cd10510bc361faac997de9efef88badc3bb9e2d1", size = 171679, upload-time = "2024-08-06T20:32:44.801Z" },
+    { url = "https://files.pythonhosted.org/packages/7c/9a/337322f27005c33bcb656c655fa78325b730324c78620e8328ae28b64d0c/PyYAML-6.0.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0ffe8360bab4910ef1b9e87fb812d8bc0a308b0d0eef8c8f44e0254ab3b07133", size = 733428, upload-time = "2024-08-06T20:32:46.432Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/69/864fbe19e6c18ea3cc196cbe5d392175b4cf3d5d0ac1403ec3f2d237ebb5/PyYAML-6.0.2-cp313-cp313-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:17e311b6c678207928d649faa7cb0d7b4c26a0ba73d41e99c4fff6b6c3276484", size = 763361, upload-time = "2024-08-06T20:32:51.188Z" },
+    { url = "https://files.pythonhosted.org/packages/04/24/b7721e4845c2f162d26f50521b825fb061bc0a5afcf9a386840f23ea19fa/PyYAML-6.0.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:70b189594dbe54f75ab3a1acec5f1e3faa7e8cf2f1e08d9b561cb41b845f69d5", size = 759523, upload-time = "2024-08-06T20:32:53.019Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/b2/e3234f59ba06559c6ff63c4e10baea10e5e7df868092bf9ab40e5b9c56b6/PyYAML-6.0.2-cp313-cp313-musllinux_1_1_aarch64.whl", hash = "sha256:41e4e3953a79407c794916fa277a82531dd93aad34e29c2a514c2c0c5fe971cc", size = 726660, upload-time = "2024-08-06T20:32:54.708Z" },
+    { url = "https://files.pythonhosted.org/packages/fe/0f/25911a9f080464c59fab9027482f822b86bf0608957a5fcc6eaac85aa515/PyYAML-6.0.2-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:68ccc6023a3400877818152ad9a1033e3db8625d899c72eacb5a668902e4d652", size = 751597, upload-time = "2024-08-06T20:32:56.985Z" },
+    { url = "https://files.pythonhosted.org/packages/14/0d/e2c3b43bbce3cf6bd97c840b46088a3031085179e596d4929729d8d68270/PyYAML-6.0.2-cp313-cp313-win32.whl", hash = "sha256:bc2fa7c6b47d6bc618dd7fb02ef6fdedb1090ec036abab80d4681424b84c1183", size = 140527, upload-time = "2024-08-06T20:33:03.001Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/de/02b54f42487e3d3c6efb3f89428677074ca7bf43aae402517bc7cca949f3/PyYAML-6.0.2-cp313-cp313-win_amd64.whl", hash = "sha256:8388ee1976c416731879ac16da0aff3f63b286ffdd57cdeb95f3f2e085687563", size = 156446, upload-time = "2024-08-06T20:33:04.33Z" },
+]
+
+[[package]]
+name = "s3transfer"
+version = "0.13.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "botocore" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/5d/9dcc100abc6711e8247af5aa561fc07c4a046f72f659c3adea9a449e191a/s3transfer-0.13.0.tar.gz", hash = "sha256:f5e6db74eb7776a37208001113ea7aa97695368242b364d73e91c981ac522177", size = 150232, upload-time = "2025-05-22T19:24:50.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/17/22bf8155aa0ea2305eefa3a6402e040df7ebe512d1310165eda1e233c3f8/s3transfer-0.13.0-py3-none-any.whl", hash = "sha256:0148ef34d6dd964d0d8cf4311b2b21c474693e57c2e069ec708ce043d2b527be", size = 85152, upload-time = "2025-05-22T19:24:48.703Z" },
+]
+
+[[package]]
+name = "setuptools"
+version = "80.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/5d/3bf57dcd21979b887f014ea83c24ae194cfcd12b9e0fda66b957c69d1fca/setuptools-80.9.0.tar.gz", hash = "sha256:f36b47402ecde768dbfafc46e8e4207b4360c654f1f3bb84475f0a28628fb19c", size = 1319958, upload-time = "2025-05-27T00:56:51.443Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl", hash = "sha256:062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922", size = 1201486, upload-time = "2025-05-27T00:56:49.664Z" },
+]
+
+[[package]]
+name = "six"
+version = "1.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "sniffio"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/87/a6771e1546d97e7e041b6ae58d80074f81b7d5121207425c964ddf5cfdbd/sniffio-1.3.1.tar.gz", hash = "sha256:f4324edc670a0f49750a81b895f35c3adb843cca46f0530f79fc1babb23789dc", size = 20372, upload-time = "2024-02-25T23:20:04.057Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e9/44/75a9c9421471a6c4805dbf2356f7c181a29c1879239abab1ea2cc8f38b40/sniffio-1.3.1-py3-none-any.whl", hash = "sha256:2f6da418d1f1e0fddd844478f41680e794e6051915791a034ff65e5f100525a2", size = 10235, upload-time = "2024-02-25T23:20:01.196Z" },
+]
+
+[[package]]
+name = "typing-extensions"
+version = "4.13.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/37/23083fcd6e35492953e8d2aaaa68b860eb422b34627b13f2ce3eb6106061/typing_extensions-4.13.2.tar.gz", hash = "sha256:e6c81219bd689f51865d9e372991c540bda33a0379d5573cddb9a3a23f7caaef", size = 106967, upload-time = "2025-04-10T14:19:05.416Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/54/b1ae86c0973cc6f0210b53d508ca3641fb6d0c56823f288d108bc7ab3cc8/typing_extensions-4.13.2-py3-none-any.whl", hash = "sha256:a439e7c04b49fec3e5d3e2beaa21755cadbbdc391694e28ccdd36ca4a1408f8c", size = 45806, upload-time = "2025-04-10T14:19:03.967Z" },
+]
+
+[[package]]
+name = "urllib3"
+version = "2.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/8a/78/16493d9c386d8e60e442a35feac5e00f0913c0f4b7c217c11e8ec2ff53e0/urllib3-2.4.0.tar.gz", hash = "sha256:414bc6535b787febd7567804cc015fee39daab8ad86268f1310a9250697de466", size = 390672, upload-time = "2025-04-10T15:23:39.232Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/11/cc635220681e93a0183390e26485430ca2c7b5f9d33b15c74c2861cb8091/urllib3-2.4.0-py3-none-any.whl", hash = "sha256:4e16665048960a0900c702d4a66415956a584919c03361cac9f1df5c5dd7e813", size = 128680, upload-time = "2025-04-10T15:23:37.377Z" },
+]
+
+[[package]]
+name = "uvicorn"
+version = "0.34.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "h11" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a6/ae/9bbb19b9e1c450cf9ecaef06463e40234d98d95bf572fab11b4f19ae5ded/uvicorn-0.34.2.tar.gz", hash = "sha256:0e929828f6186353a80b58ea719861d2629d766293b6d19baf086ba31d4f3328", size = 76815, upload-time = "2025-04-19T06:02:50.101Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b1/4b/4cef6ce21a2aaca9d852a6e84ef4f135d99fcd74fa75105e2fc0c8308acd/uvicorn-0.34.2-py3-none-any.whl", hash = "sha256:deb49af569084536d269fe0a6d67e3754f104cf03aba7c11c40f01aadf33c403", size = 62483, upload-time = "2025-04-19T06:02:48.42Z" },
+]
+
+[[package]]
+name = "zeeker-datasette"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "boto3" },
+    { name = "click" },
+    { name = "datasette" },
+    { name = "datasette-search-all" },
+    { name = "python-dotenv" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-mock" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "boto3", specifier = ">=1.28.0" },
+    { name = "click", specifier = ">=8.1.3" },
+    { name = "datasette", specifier = "==0.65.1" },
+    { name = "datasette-search-all", specifier = ">=1.1.4" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8.4.0" },
+    { name = "pytest-mock", specifier = ">=3.14.1" },
+]
+
+</document_content>
+</document>
+<document index="10">
 <source>./zeeker-refresh-cron.sh</source>
 <document_content>
 #!/bin/bash
@@ -330,13 +943,2376 @@ else
 fi
 </document_content>
 </document>
-<document index="9">
+<document index="11">
+<source>./tests/conftest.py</source>
+<document_content>
+"""
+Shared pytest fixtures and configuration for zeeker-datasette tests
+"""
+
+import json
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
+
+
+@pytest.fixture
+def temp_project_structure():
+    """
+    Create a temporary project structure that mirrors the real project
+    Useful for integration tests that need the full directory layout
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create main directories
+        directories = [
+            "data",
+            "templates",
+            "static",
+            "static/css",
+            "static/js",
+            "static/images",
+            "static/databases",
+            "plugins",
+            "scripts",
+        ]
+
+        for directory in directories:
+            (temp_path / directory).mkdir(parents=True, exist_ok=True)
+
+        # Create basic files
+        files = {
+            "metadata.json": {
+                "title": "Test Zeeker",
+                "description": "Test instance",
+                "databases": {"*": {"allow_sql": True}},
+                "extra_css_urls": ["/static/css/zeeker-theme.css"],
+                "extra_js_urls": ["/static/js/zeeker-enhanced.js"],
+            },
+            ".env": "S3_BUCKET=test-bucket\nAWS_REGION=us-east-1\n",
+            "templates/index.html": "<html><body>Test Index</body></html>",
+            "templates/database.html": "<html><body>Test Database</body></html>",
+            "static/css/zeeker-theme.css": "body { background: #1a1a1a; }",
+            "static/js/zeeker-enhanced.js": "console.log('Enhanced JS loaded');",
+            "plugins/__init__.py": "",
+            "plugins/template_filters.py": "# Template filters",
+        }
+
+        for file_path, content in files.items():
+            full_path = temp_path / file_path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if isinstance(content, dict):
+                full_path.write_text(json.dumps(content, indent=2))
+            else:
+                full_path.write_text(content)
+
+        yield temp_path
+
+
+@pytest.fixture
+def mock_environment():
+    """
+    Mock environment variables commonly used in tests
+    """
+    env_vars = {
+        "S3_BUCKET": "test-bucket",
+        "AWS_REGION": "us-east-1",
+        "AWS_ACCESS_KEY_ID": "test-access-key",
+        "AWS_SECRET_ACCESS_KEY": "test-secret-key",
+    }
+
+    with pytest.MonkeyPatch().context() as mp:
+        for key, value in env_vars.items():
+            mp.setenv(key, value)
+        yield env_vars
+
+
+@pytest.fixture
+def mock_boto3_client():
+    """
+    Create a comprehensively mocked boto3 S3 client
+    with common responses for different operations
+    """
+    client = Mock()
+
+    # Default responses for common operations
+    client.list_objects_v2.return_value = {"Contents": []}
+    client.head_object.return_value = {"ContentLength": 1024}
+    client.download_file.return_value = None
+    client.upload_file.return_value = None
+
+    # Paginator mock
+    paginator = Mock()
+    paginator.paginate.return_value = [{"Contents": []}]
+    client.get_paginator.return_value = paginator
+
+    return client
+
+
+@pytest.fixture
+def sample_database_files():
+    """
+    Create sample database files in a temporary directory
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+
+        # Create sample .db files with different sizes
+        databases = {
+            "courts.db": b"Courts database content " * 100,
+            "parliament.db": b"Parliament database content " * 200,
+            "regulations.db": b"Regulations database content " * 150,
+        }
+
+        for filename, content in databases.items():
+            (temp_path / filename).write_bytes(content)
+
+        yield temp_path, databases
+
+
+@pytest.fixture
+def sample_metadata():
+    """
+    Return sample metadata structures for testing merging logic
+    """
+    return {
+        "base": {
+            "title": "Base Zeeker",
+            "description": "Base instance",
+            "databases": {
+                "*": {"allow_sql": True, "allow_facet": True},
+                "base_db": {"custom_setting": True},
+            },
+            "extra_css_urls": ["/static/base.css"],
+            "plugins": {"base_plugin": {"enabled": True}},
+        },
+        "overlay": {
+            "title": "Custom Zeeker",
+            "databases": {
+                "custom_db": {"new_setting": True},
+                "base_db": {"override_setting": "overridden"},
+            },
+            "extra_css_urls": ["/static/custom.css"],
+            "new_field": "new_value",
+        },
+        "expected_merged": {
+            "title": "Custom Zeeker",  # Overridden
+            "description": "Base instance",  # Preserved
+            "databases": {
+                "*": {"allow_sql": True, "allow_facet": True},  # Preserved
+                "base_db": {
+                    "custom_setting": True,
+                    "override_setting": "overridden",
+                },  # Merged
+                "custom_db": {"new_setting": True},  # Added
+            },
+            "extra_css_urls": ["/static/base.css", "/static/custom.css"],  # Appended
+            "plugins": {"base_plugin": {"enabled": True}},  # Preserved
+            "new_field": "new_value",  # Added
+        },
+    }
+
+
+@pytest.fixture
+def mock_logger():
+    """
+    Create a mock logger for testing log output
+    """
+    logger = Mock()
+    logger.debug = Mock()
+    logger.info = Mock()
+    logger.warning = Mock()
+    logger.error = Mock()
+    logger.critical = Mock()
+    return logger
+
+
+@pytest.fixture(autouse=True)
+def cleanup_test_artifacts():
+    """
+    Automatically clean up test artifacts after each test
+    """
+    yield
+
+    # Clean up any temporary files that might have been created
+    # in the current directory during tests
+    test_artifacts = [
+        "test_*.db",
+        "*.backup.*",
+        "test_metadata.json",
+        ".test_env",
+    ]
+
+    current_dir = Path.cwd()
+    for pattern in test_artifacts:
+        for artifact in current_dir.glob(pattern):
+            try:
+                if artifact.is_file():
+                    artifact.unlink()
+                elif artifact.is_dir():
+                    import shutil
+
+                    shutil.rmtree(artifact)
+            except (OSError, PermissionError):
+                # Ignore cleanup errors in tests
+                pass
+
+
+@pytest.fixture
+def s3_responses():
+    """
+    Predefined S3 responses for different scenarios
+    """
+    return {
+        "empty_bucket": {"Contents": []},
+        "database_files": {
+            "Contents": [
+                {
+                    "Key": "latest/courts.db",
+                    "Size": 1024000,
+                    "LastModified": "2025-05-28T10:00:00Z",
+                },
+                {
+                    "Key": "latest/parliament.db",
+                    "Size": 2048000,
+                    "LastModified": "2025-05-28T11:00:00Z",
+                },
+            ]
+        },
+        "asset_files": {
+            "Contents": [
+                {"Key": "assets/default/metadata.json"},
+                {"Key": "assets/default/templates/index.html"},
+                {"Key": "assets/default/static/css/style.css"},
+            ]
+        },
+        "database_customizations": {
+            "CommonPrefixes": [
+                {"Prefix": "assets/databases/courts/"},
+                {"Prefix": "assets/databases/parliament/"},
+            ]
+        },
+    }
+
+
+# Mark configurations for different test types
+pytest.mark.unit = pytest.mark.unit
+pytest.mark.integration = pytest.mark.integration
+pytest.mark.s3 = pytest.mark.s3
+pytest.mark.slow = pytest.mark.slow
+pytest.mark.docker = pytest.mark.docker
+pytest.mark.network = pytest.mark.network
+
+
+def pytest_configure(config):
+    """
+    Configure pytest with custom settings
+    """
+    # Add custom markers
+    config.addinivalue_line("markers", "unit: Unit tests")
+    config.addinivalue_line("markers", "integration: Integration tests")
+    config.addinivalue_line("markers", "s3: Tests that interact with S3")
+    config.addinivalue_line("markers", "slow: Slow running tests")
+    config.addinivalue_line("markers", "docker: Tests requiring Docker")
+    config.addinivalue_line("markers", "network: Tests requiring network access")
+
+
+def pytest_collection_modifyitems(config, items):
+    """
+    Modify test collection to add markers automatically
+    """
+    for item in items:
+        # Mark all test functions in test_download_from_s3.py as s3 tests
+        if "test_download_from_s3" in str(item.fspath):
+            item.add_marker(pytest.mark.s3)
+
+        # Mark integration tests
+        if "integration" in item.name.lower() or "TestIntegration" in str(item.cls):
+            item.add_marker(pytest.mark.integration)
+        else:
+            item.add_marker(pytest.mark.unit)
+
+        # Mark slow tests
+        if "slow" in item.name.lower() or "full" in item.name.lower():
+            item.add_marker(pytest.mark.slow)
+</document_content>
+</document>
+<document index="12">
+<source>./tests/fixtures.py</source>
+<document_content>
+#!/usr/bin/env python3
+"""
+Test fixtures and sample data for zeeker-datasette tests
+"""
+
+from datetime import datetime, timedelta
+
+
+class SampleData:
+    """Sample data for testing various scenarios"""
+
+    @staticmethod
+    def sample_s3_responses():
+        """Sample S3 API responses for different scenarios"""
+        return {
+            "empty_bucket": {"Contents": []},
+
+            "database_files_small": {
+                "Contents": [
+                    {
+                        "Key": "latest/courts.db",
+                        "Size": 1024000,
+                        "LastModified": datetime.now() - timedelta(hours=1),
+                    },
+                    {
+                        "Key": "latest/parliament.db",
+                        "Size": 2048000,
+                        "LastModified": datetime.now() - timedelta(hours=2),
+                    },
+                ]
+            },
+
+            "database_files_large": {
+                "Contents": [
+                    {
+                        "Key": "latest/courts.db",
+                        "Size": 50 * 1024 * 1024,  # 50MB
+                        "LastModified": datetime.now() - timedelta(hours=1),
+                    },
+                    {
+                        "Key": "latest/parliament.db",
+                        "Size": 100 * 1024 * 1024,  # 100MB
+                        "LastModified": datetime.now() - timedelta(hours=2),
+                    },
+                    {
+                        "Key": "latest/regulations.db",
+                        "Size": 25 * 1024 * 1024,  # 25MB
+                        "LastModified": datetime.now() - timedelta(hours=3),
+                    },
+                    {
+                        "Key": "latest/news.db",
+                        "Size": 10 * 1024 * 1024,  # 10MB
+                        "LastModified": datetime.now() - timedelta(hours=4),
+                    },
+                ]
+            },
+
+            "asset_files_default": {
+                "Contents": [
+                    {"Key": "assets/default/metadata.json"},
+                    {"Key": "assets/default/templates/index.html"},
+                    {"Key": "assets/default/templates/database.html"},
+                    {"Key": "assets/default/templates/table.html"},
+                    {"Key": "assets/default/templates/row.html"},
+                    {"Key": "assets/default/templates/query.html"},
+                    {"Key": "assets/default/static/css/zeeker-theme.css"},
+                    {"Key": "assets/default/static/js/zeeker-enhanced.js"},
+                    {"Key": "assets/default/plugins/__init__.py"},
+                    {"Key": "assets/default/plugins/template_filters.py"},
+                ]
+            },
+
+            "database_customizations": {
+                "CommonPrefixes": [
+                    {"Prefix": "assets/databases/courts/"},
+                    {"Prefix": "assets/databases/parliament/"},
+                    {"Prefix": "assets/databases/news/"},
+                ]
+            },
+
+            "courts_customizations": {
+                "Contents": [
+                    {"Key": "assets/databases/courts/metadata.json"},
+                    {"Key": "assets/databases/courts/templates/database-courts.html"},
+                    {"Key": "assets/databases/courts/templates/table-supreme_court.html"},
+                    {"Key": "assets/databases/courts/static/css/courts-theme.css"},
+                    {"Key": "assets/databases/courts/static/js/courts-enhanced.js"},
+                ]
+            },
+        }
+
+    @staticmethod
+    def sample_metadata():
+        """Sample metadata structures for testing"""
+        return {
+            "base_minimal": {
+                "title": "Zeeker Legal Data",
+                "description": "Singapore legal data backbone",
+                "databases": {
+                    "*": {
+                        "allow_sql": True,
+                        "allow_facet": True,
+                        "allow_download": True,
+                    }
+                },
+            },
+
+            "base_comprehensive": {
+                "title": "data.zeeker.sg - The Legal Data Backbone",
+                "description": "Singapore's open legal data resource for data applications and AI",
+                "license": "CC-BY-4.0",
+                "license_url": "https://creativecommons.org/licenses/by/4.0/",
+                "source": "Various Singapore legal sources",
+                "source_url": "https://data.zeeker.sg/templates/pages/sources",
+                "about": "Providing free access to Singapore legal resources",
+                "about_url": "https://data.zeeker.sg/templates/pages/about",
+                "databases": {
+                    "*": {
+                        "allow_sql": True,
+                        "allow_facet": True,
+                        "allow_download": True,
+                    },
+                    "courts": {
+                        "title": "Court Decisions",
+                        "description": "Supreme Court and High Court decisions",
+                        "custom_template": "database-courts.html",
+                    },
+                    "parliament": {
+                        "title": "Parliamentary Proceedings",
+                        "description": "Debates, bills, and committee reports",
+                        "custom_css": "/static/databases/parliament/theme.css",
+                    },
+                },
+                "plugins": {
+                    "datasette-search-all": {
+                        "template": "Search across all Singapore legal resources"
+                    }
+                },
+                "extra_css_urls": [
+                    "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap",
+                    "/static/css/zeeker-theme.css"
+                ],
+                "extra_js_urls": ["/static/js/zeeker-enhanced.js"],
+                "menu_links": [
+                    {"href": "/", "label": "Home"},
+                    {"href": "/-/metadata", "label": "API Info"},
+                    {"href": "/templates/pages/about", "label": "About"},
+                ],
+            },
+
+            "overlay_courts": {
+                "databases": {
+                    "courts": {
+                        "custom_template": "database-courts-v2.html",
+                        "custom_js": "/static/databases/courts/enhanced.js",
+                        "facet_columns": ["court_type", "year", "case_type"],
+                    }
+                },
+                "extra_css_urls": ["/static/databases/courts/courts-theme.css"],
+                "extra_js_urls": ["/static/databases/courts/courts-enhanced.js"],
+            },
+
+            "overlay_parliament": {
+                "databases": {
+                    "parliament": {
+                        "custom_template": "database-parliament.html",
+                        "search_columns": ["speaker", "topic", "date"],
+                    },
+                    "hansard": {
+                        "title": "Hansard Records",
+                        "description": "Official parliamentary debate records",
+                        "allow_sql": True,
+                    },
+                },
+                "extra_css_urls": ["/static/databases/parliament/parliament-theme.css"],
+            },
+
+            "large_metadata": {
+                "title": "Large Scale Legal Database",
+                "databases": {
+                    **{f"database_{i}": {
+                        "title": f"Database {i}",
+                        "description": f"Description for database {i}" * 5,
+                        "tables": [f"table_{j}" for j in range(20)],
+                        "settings": {f"setting_{k}": f"value_{k}" for k in range(100)},
+                    } for i in range(50)},
+                    "*": {"allow_sql": True},
+                },
+                "plugins": {f"plugin_{i}": {"enabled": True, "config": {}} for i in range(25)},
+                "large_config_array": list(range(10000)),
+                "complex_nested": {
+                    "level1": {f"item_{i}": {"data": list(range(100))} for i in range(100)}
+                },
+            },
+        }
+
+    @staticmethod
+    def sample_database_files():
+        """Sample database file contents for testing"""
+        return {
+            "courts.db": {
+                "content": b"SQLite format 3\x00" + b"Courts database content" * 1000,
+                "description": "Court decisions database",
+                "tables": ["supreme_court", "high_court", "district_court"],
+                "size": 25600,  # ~25KB
+            },
+
+            "parliament.db": {
+                "content": b"SQLite format 3\x00" + b"Parliament database content" * 2000,
+                "description": "Parliamentary proceedings database",
+                "tables": ["debates", "bills", "motions", "committees"],
+                "size": 51200,  # ~50KB
+            },
+
+            "regulations.db": {
+                "content": b"SQLite format 3\x00" + b"Regulations database content" * 1500,
+                "description": "Legal regulations and statutes",
+                "tables": ["statutes", "subsidiary_legislation", "guidelines"],
+                "size": 38400,  # ~37KB
+            },
+
+            "large_database.db": {
+                "content": b"SQLite format 3\x00" + b"Large database content" * 100000,
+                "description": "Large test database for performance testing",
+                "tables": ["large_table_1", "large_table_2"],
+                "size": 2560000,  # ~2.5MB
+            },
+        }
+
+    @staticmethod
+    def sample_template_files():
+        """Sample template files for testing"""
+        return {
+            "index.html": """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ metadata.title or "Zeeker Legal Data" }}</title>
+    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+</head>
+<body>
+    <header>
+        <h1>{{ metadata.title }}</h1>
+        <p>{{ metadata.description }}</p>
+    </header>
+    <main>
+        {% if databases %}
+        <section class="databases">
+            <h2>Available Databases</h2>
+            {% for database in databases %}
+            <div class="database-card">
+                <h3><a href="/{{ database.name }}">{{ database.title or database.name|title }}</a></h3>
+                <p>{{ database.description or "Legal database" }}</p>
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>""",
+
+            "database.html": """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ database|title }} - {{ metadata.title }}</title>
+    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+</head>
+<body>
+    <header>
+        <h1>{{ database|title }} Database</h1>
+        <nav>
+            <a href="/">← Back to Home</a>
+        </nav>
+    </header>
+    <main>
+        {% if tables %}
+        <section class="tables">
+            <h2>Tables</h2>
+            {% for table in tables %}
+            <div class="table-card">
+                <h3><a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a></h3>
+                {% if table.count %}
+                <p>{{ table.count }} rows</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>""",
+
+            "database-courts.html": """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Court Decisions - {{ metadata.title }}</title>
+    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+    <link rel="stylesheet" href="/static/databases/courts/courts-theme.css">
+</head>
+<body class="courts-database">
+    <header>
+        <h1>🏛️ Court Decisions Database</h1>
+        <p>Supreme Court and High Court decisions from Singapore</p>
+    </header>
+    <main>
+        <!-- Custom courts-specific content -->
+        <section class="court-types">
+            <h2>Court Types</h2>
+            <div class="court-grid">
+                <div class="court-card supreme-court">
+                    <h3>Supreme Court</h3>
+                    <p>Final appellate court decisions</p>
+                </div>
+                <div class="court-card high-court">
+                    <h3>High Court</h3>
+                    <p>Original and appellate jurisdiction</p>
+                </div>
+            </div>
+        </section>
+
+        {% if tables %}
+        <section class="tables">
+            <h2>Available Tables</h2>
+            {% for table in tables %}
+            <div class="table-card">
+                <h3><a href="/courts/{{ table.name }}">{{ table.name|title }}</a></h3>
+                {% if table.count %}
+                <p>{{ table.count }} decisions</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </section>
+        {% endif %}
+    </main>
+    <script src="/static/databases/courts/courts-enhanced.js"></script>
+</body>
+</html>""",
+        }
+
+    @staticmethod
+    def sample_static_files():
+        """Sample static files for testing"""
+        return {
+            "css/zeeker-theme.css": """/* Zeeker Base Theme */
+:root {
+    --color-bg-primary: #1a1a1a;
+    --color-bg-secondary: #2a2a2a;
+    --color-text-primary: #ffffff;
+    --color-accent-cyan: #00d4ff;
+}
+
+body {
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background: var(--color-bg-secondary);
+    padding: 2rem;
+    text-align: center;
+}
+
+.database-card, .table-card {
+    background: var(--color-bg-secondary);
+    border: 1px solid #404040;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.database-card h3 a, .table-card h3 a {
+    color: var(--color-accent-cyan);
+    text-decoration: none;
+}""",
+
+            "js/zeeker-enhanced.js": """// Zeeker Enhanced JavaScript
+class ZeekerEnhancer {
+    constructor() {
+        this.init();
+    }
+
+    init() {
+        console.log('Zeeker Enhanced: Initializing...');
+        this.addInteractivity();
+        console.log('Zeeker Enhanced: Complete');
+    }
+
+    addInteractivity() {
+        // Add hover effects to cards
+        const cards = document.querySelectorAll('.database-card, .table-card');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.transform = 'translateY(-2px)';
+                card.style.boxShadow = '0 4px 8px rgba(0, 212, 255, 0.2)';
+            });
+
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = 'translateY(0)';
+                card.style.boxShadow = 'none';
+            });
+        });
+    }
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new ZeekerEnhancer();
+});""",
+
+            "databases/courts/courts-theme.css": """/* Courts-specific theme */
+.courts-database {
+    --court-primary: #8B5CF6;
+    --court-secondary: #A78BFA;
+}
+
+.courts-database header {
+    background: linear-gradient(135deg, var(--court-primary), var(--court-secondary));
+}
+
+.court-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.court-card {
+    background: var(--color-bg-secondary);
+    border: 2px solid var(--court-primary);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.court-card h3 {
+    color: var(--court-primary);
+    margin: 0 0 0.5rem 0;
+}
+
+.supreme-court {
+    border-color: #DC2626;
+}
+
+.high-court {
+    border-color: #2563EB;
+}""",
+
+            "databases/courts/courts-enhanced.js": """// Courts-specific JavaScript
+class CourtsEnhancer extends ZeekerEnhancer {
+    init() {
+        super.init();
+        this.addCourtsFeatures();
+    }
+
+    addCourtsFeatures() {
+        console.log('Courts: Adding specialized features...');
+
+        // Add court-specific interactions
+        const courtCards = document.querySelectorAll('.court-card');
+        courtCards.forEach(card => {
+            card.addEventListener('click', () => {
+                console.log(`Clicked on ${card.querySelector('h3').textContent}`);
+            });
+        });
+
+        // Add search suggestions for legal terms
+        const searchInputs = document.querySelectorAll('input[type="search"]');
+        searchInputs.forEach(input => {
+            input.addEventListener('focus', () => {
+                this.showLegalSearchSuggestions(input);
+            });
+        });
+    }
+
+    showLegalSearchSuggestions(input) {
+        const suggestions = [
+            'contract law',
+            'criminal procedure',
+            'tort liability',
+            'constitutional law',
+            'evidence rules'
+        ];
+
+        // Create suggestions dropdown (simplified)
+        console.log('Legal search suggestions:', suggestions);
+    }
+}
+
+// Override the base class
+document.addEventListener('DOMContentLoaded', () => {
+    new CourtsEnhancer();
+});""",
+        }
+
+    @staticmethod
+    def sample_environment_configs():
+        """Sample environment configurations for testing"""
+        return {
+            "development": {
+                "S3_BUCKET": "zeeker-dev-bucket",
+                "S3_PREFIX": "latest",
+                "AWS_REGION": "us-east-1",
+                "DATASETTE_DATABASE_DIR": "/data",
+                "DATASETTE_TEMPLATE_DIR": "/app/templates",
+                "DATASETTE_PLUGINS_DIR": "/app/plugins",
+                "DATASETTE_STATIC_DIR": "/app/static",
+                "DATASETTE_METADATA": "/app/metadata.json",
+            },
+
+            "production": {
+                "S3_BUCKET": "zeeker-prod-bucket",
+                "S3_PREFIX": "latest",
+                "S3_ENDPOINT_URL": "https://s3.amazonaws.com",
+                "AWS_REGION": "ap-southeast-1",
+                "DATASETTE_DATABASE_DIR": "/data",
+                "DATASETTE_TEMPLATE_DIR": "/app/templates",
+                "DATASETTE_PLUGINS_DIR": "/app/plugins",
+                "DATASETTE_STATIC_DIR": "/app/static",
+                "DATASETTE_METADATA": "/app/metadata.json",
+            },
+
+            "test": {
+                "S3_BUCKET": "test-bucket",
+                "AWS_REGION": "us-east-1",
+                "AWS_ACCESS_KEY_ID": "test-access-key",
+                "AWS_SECRET_ACCESS_KEY": "test-secret-key",
+            },
+
+            "custom_endpoint": {
+                "S3_BUCKET": "custom-bucket",
+                "S3_ENDPOINT_URL": "https://custom.s3.endpoint.com",
+                "AWS_REGION": "eu-west-1",
+            },
+        }
+
+    @staticmethod
+    def sample_error_scenarios():
+        """Sample error scenarios for testing"""
+        return {
+            "s3_errors": {
+                "NoSuchBucket": {
+                    "Error": {"Code": "NoSuchBucket", "Message": "The specified bucket does not exist"},
+                    "operation": "ListObjects"
+                },
+                "AccessDenied": {
+                    "Error": {"Code": "AccessDenied", "Message": "Access Denied"},
+                    "operation": "GetObject"
+                },
+                "RequestTimeout": {
+                    "Error": {"Code": "RequestTimeout",
+                              "Message": "Your socket connection to the server was not read from or written to within the timeout period"},
+                    "operation": "DownloadFile"
+                },
+                "SlowDown": {
+                    "Error": {"Code": "SlowDown", "Message": "Please reduce your request rate"},
+                    "operation": "ListObjects"
+                },
+            },
+
+            "file_system_errors": {
+                "PermissionError": "Permission denied",
+                "FileNotFoundError": "No such file or directory",
+                "OSError": "No space left on device",
+                "IsADirectoryError": "Is a directory",
+            },
+
+            "json_errors": {
+                "invalid_json": '{"invalid": json content}',
+                "empty_file": "",
+                "corrupted_unicode": b'\xff\xfe\x00\x00invalid unicode',
+            },
+
+            "network_errors": {
+                "ConnectionError": "Failed to establish a new connection",
+                "TimeoutError": "The read operation timed out",
+                "DNSError": "Name resolution failed",
+            },
+        }
+
+
+class PerformanceData:
+    """Performance test data and benchmarks"""
+
+    @staticmethod
+    def get_benchmark_targets():
+        """Performance benchmarks and targets"""
+        return {
+            "hash_calculation": {
+                "small_files": {"target": "< 100ms", "files": 10, "size_kb": 10},
+                "medium_files": {"target": "< 500ms", "files": 50, "size_kb": 100},
+                "large_files": {"target": "< 2s", "files": 100, "size_kb": 1000},
+            },
+
+            "metadata_merge": {
+                "small": {"target": "< 10ms", "databases": 10, "settings": 10},
+                "medium": {"target": "< 50ms", "databases": 100, "settings": 100},
+                "large": {"target": "< 200ms", "databases": 1000, "settings": 1000},
+            },
+
+            "s3_operations": {
+                "list_objects": {"target": "< 1s", "objects": 1000},
+                "download_simulation": {"target": "< 100ms", "files": 10},
+                "upload_simulation": {"target": "< 200ms", "files": 10},
+            },
+
+            "memory_usage": {
+                "hash_large_files": {"target": "< 50MB", "file_size_mb": 100},
+                "metadata_large": {"target": "< 20MB", "metadata_items": 10000},
+            },
+        }
+
+    @staticmethod
+    def create_performance_test_data(size_category="medium"):
+        """Create test data for performance testing"""
+        targets = PerformanceData.get_benchmark_targets()
+
+        if size_category == "small":
+            return {
+                "num_files": 10,
+                "file_size": 1024 * 10,  # 10KB
+                "metadata_items": 10,
+            }
+        elif size_category == "large":
+            return {
+                "num_files": 100,
+                "file_size": 1024 * 1024,  # 1MB
+                "metadata_items": 1000,
+            }
+        else:  # medium
+            return {
+                "num_files": 50,
+                "file_size": 1024 * 100,  # 100KB
+                "metadata_items": 100,
+            }
+
+
+class TestScenarios:
+    """Predefined test scenarios for different testing needs"""
+
+    @staticmethod
+    def get_basic_s3_scenario():
+        """Basic S3 scenario with minimal data"""
+        return {
+            "databases": SampleData.sample_s3_responses()["database_files_small"],
+            "base_assets": SampleData.sample_s3_responses()["asset_files_default"],
+            "metadata": SampleData.sample_metadata()["base_minimal"],
+        }
+
+    @staticmethod
+    def get_comprehensive_scenario():
+        """Comprehensive scenario with full feature set"""
+        return {
+            "databases": SampleData.sample_s3_responses()["database_files_large"],
+            "base_assets": SampleData.sample_s3_responses()["asset_files_default"],
+            "customizations": SampleData.sample_s3_responses()["database_customizations"],
+            "courts_assets": SampleData.sample_s3_responses()["courts_customizations"],
+            "base_metadata": SampleData.sample_metadata()["base_comprehensive"],
+            "overlay_metadata": SampleData.sample_metadata()["overlay_courts"],
+        }
+
+    @staticmethod
+    def get_error_scenario():
+        """Error scenario for testing error handling"""
+        return {
+            "s3_errors": SampleData.sample_error_scenarios()["s3_errors"],
+            "file_errors": SampleData.sample_error_scenarios()["file_system_errors"],
+            "corrupted_data": SampleData.sample_error_scenarios()["json_errors"],
+        }
+
+    @staticmethod
+    def get_performance_scenario():
+        """Performance scenario for benchmarking"""
+        return {
+            "test_data": PerformanceData.create_performance_test_data("large"),
+            "benchmarks": PerformanceData.get_benchmark_targets(),
+            "large_metadata": SampleData.sample_metadata()["large_metadata"],
+        }
+
+
+# Export main classes for easy import
+__all__ = [
+    "SampleData",
+    "PerformanceData",
+    "TestScenarios",
+]
+</document_content>
+</document>
+<document index="13">
+<source>./tests/test_download_from_s3.py</source>
+<document_content>
+#!/usr/bin/env python3
+"""
+Tests for scripts/download_from_s3.py
+"""
+
+import json
+import os
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
+from botocore.exceptions import ClientError
+
+from scripts.download_from_s3 import ZeekerS3Downloader, download_from_s3
+
+
+class TestZeekerS3Downloader:
+    """Test suite for ZeekerS3Downloader class"""
+
+    @pytest.fixture
+    def mock_s3_client(self):
+        """Mock S3 client with common responses"""
+        client = Mock()
+        client.get_paginator.return_value.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "latest/test.db", "Size": 1024},
+                    {"Key": "latest/another.db", "Size": 2048},
+                ]
+            }
+        ]
+        return client
+
+    @pytest.fixture
+    def temp_directories(self):
+        """Create temporary directories for testing"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            data_dir = temp_path / "data"
+            templates_dir = temp_path / "templates"
+            static_dir = temp_path / "static"
+            plugins_dir = temp_path / "plugins"
+
+            # Create directories
+            data_dir.mkdir()
+            templates_dir.mkdir()
+            static_dir.mkdir()
+            plugins_dir.mkdir()
+
+            # Create a sample metadata file
+            metadata_file = temp_path / "metadata.json"
+            metadata_file.write_text(
+                json.dumps(
+                    {
+                        "title": "Test Zeeker",
+                        "databases": {"*": {"allow_sql": True}},
+                        "extra_css_urls": ["/static/base.css"],
+                    }
+                )
+            )
+
+            yield {
+                "temp_dir": temp_path,
+                "data_dir": data_dir,
+                "templates_dir": templates_dir,
+                "static_dir": static_dir,
+                "plugins_dir": plugins_dir,
+                "metadata_file": metadata_file,
+            }
+
+    @pytest.fixture
+    def downloader(self, temp_directories):
+        """Create a ZeekerS3Downloader instance with mocked paths"""
+        with patch.dict(os.environ, {"S3_BUCKET": "test-bucket"}):
+            downloader = ZeekerS3Downloader()
+
+            # Override paths to use temporary directories
+            dirs = temp_directories
+            downloader.data_dir = dirs["data_dir"]
+            downloader.templates_dir = dirs["templates_dir"]
+            downloader.static_dir = dirs["static_dir"]
+            downloader.plugins_dir = dirs["plugins_dir"]
+            downloader.metadata_file = dirs["metadata_file"]
+
+            return downloader
+
+    def test_init_missing_s3_bucket(self):
+        """Test initialization fails without S3_BUCKET environment variable"""
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(SystemExit):
+                ZeekerS3Downloader()
+
+    def test_init_with_custom_endpoint(self):
+        """Test initialization with custom S3 endpoint"""
+        with patch.dict(
+            os.environ,
+            {
+                "S3_BUCKET": "test-bucket",
+                "S3_ENDPOINT_URL": "https://custom.endpoint.com",
+                "AWS_REGION": "us-west-2",
+            },
+        ):
+            with patch("scripts.download_from_s3.boto3.client") as mock_boto3:
+                downloader = ZeekerS3Downloader()
+                mock_boto3.assert_called_with(
+                    "s3",
+                    region_name="us-west-2",
+                    endpoint_url="https://custom.endpoint.com",
+                )
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_download_database_files_success(self, mock_boto3, downloader, mock_s3_client):
+        """Test successful database file download"""
+        downloader.s3_client = mock_s3_client
+
+        # Mock the download_file method
+        mock_s3_client.download_file = Mock()
+
+        databases = downloader._download_database_files()
+
+        assert databases == {"test", "another"}
+        assert mock_s3_client.download_file.call_count == 2
+
+        # Verify files would be downloaded to correct locations
+        calls = mock_s3_client.download_file.call_args_list
+        assert str(downloader.data_dir / "test.db") in calls[0][0]
+        assert str(downloader.data_dir / "another.db") in calls[1][0]
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_download_database_files_no_contents(self, mock_boto3, downloader):
+        """Test database file download when no files exist"""
+        mock_s3_client = Mock()
+        mock_s3_client.get_paginator.return_value.paginate.return_value = [{}]
+        downloader.s3_client = mock_s3_client
+
+        databases = downloader._download_database_files()
+
+        assert databases == set()
+
+    def test_check_base_assets_exist_all_present(self, downloader):
+        """Test base assets check when all required files exist"""
+        mock_s3_client = Mock()
+        mock_s3_client.head_object = Mock()  # No exception means file exists
+        downloader.s3_client = mock_s3_client
+
+        result = downloader._check_base_assets_exist()
+
+        assert result is True
+        assert mock_s3_client.head_object.call_count == 3  # 3 required files
+
+    def test_check_base_assets_exist_missing_files(self, downloader):
+        """Test base assets check when some files are missing"""
+        mock_s3_client = Mock()
+        mock_s3_client.head_object.side_effect = ClientError(
+            {"Error": {"Code": "404"}}, "HeadObject"
+        )
+        downloader.s3_client = mock_s3_client
+
+        result = downloader._check_base_assets_exist()
+
+        assert result is False
+
+    def test_deep_merge_metadata(self, downloader):
+        """Test metadata merging functionality"""
+        base = {
+            "title": "Base Title",
+            "databases": {"*": {"allow_sql": True}, "db1": {"custom": True}},
+            "extra_css_urls": ["/base.css"],
+            "plugins": {"base_plugin": {}},
+        }
+
+        overlay = {
+            "title": "Override Title",
+            "databases": {"db2": {"new_db": True}},
+            "extra_css_urls": ["/overlay.css"],
+            "new_field": "new_value",
+        }
+
+        result = downloader._deep_merge_metadata(base, overlay)
+
+        # Title should be overridden
+        assert result["title"] == "Override Title"
+
+        # CSS URLs should be appended
+        assert result["extra_css_urls"] == ["/base.css", "/overlay.css"]
+
+        # Databases should be merged (but not override '*')
+        assert result["databases"]["*"]["allow_sql"] is True  # Base preserved
+        assert result["databases"]["db1"]["custom"] is True  # Base preserved
+        assert result["databases"]["db2"]["new_db"] is True  # Overlay added
+
+        # New fields should be added
+        assert result["new_field"] == "new_value"
+
+        # Existing fields not in overlay should be preserved
+        assert result["plugins"] == {"base_plugin": {}}
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_download_s3_directory(self, mock_boto3, downloader, temp_directories):
+        """Test downloading an entire S3 directory"""
+        mock_s3_client = Mock()
+        mock_s3_client.get_paginator.return_value.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "assets/default/templates/index.html"},
+                    {"Key": "assets/default/templates/base.html"},
+                    {"Key": "assets/default/static/css/style.css"},
+                ]
+            }
+        ]
+        mock_s3_client.download_file = Mock()
+        downloader.s3_client = mock_s3_client
+
+        target_dir = temp_directories["templates_dir"]
+        downloader._download_s3_directory("assets/default/templates/", target_dir)
+
+        # Should download 2 template files
+        assert mock_s3_client.download_file.call_count == 2
+
+        # Verify the correct files were downloaded
+        calls = mock_s3_client.download_file.call_args_list
+        downloaded_files = [call[0][1] for call in calls]
+        assert "assets/default/templates/index.html" in downloaded_files
+        assert "assets/default/templates/base.html" in downloaded_files
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_upload_directory_to_s3(self, mock_boto3, downloader, temp_directories):
+        """Test uploading a local directory to S3"""
+        # Create some test files
+        templates_dir = temp_directories["templates_dir"]
+        (templates_dir / "index.html").write_text("<html>Test</html>")
+        (templates_dir / "subdir").mkdir()
+        (templates_dir / "subdir" / "page.html").write_text("<html>Page</html>")
+
+        mock_s3_client = Mock()
+        mock_s3_client.upload_file = Mock()
+        downloader.s3_client = mock_s3_client
+
+        downloader._upload_directory_to_s3(templates_dir, "assets/default/templates/")
+
+        # Should upload 2 files
+        assert mock_s3_client.upload_file.call_count == 2
+
+        # Verify correct S3 keys
+        calls = mock_s3_client.upload_file.call_args_list
+        s3_keys = [call[0][2] for call in calls]
+        assert "assets/default/templates/index.html" in s3_keys
+        assert "assets/default/templates/subdir/page.html" in s3_keys
+
+    def test_check_s3_path_exists_true(self, downloader):
+        """Test S3 path existence check when path exists"""
+        mock_s3_client = Mock()
+        mock_s3_client.list_objects_v2.return_value = {"Contents": [{"Key": "test"}]}
+        downloader.s3_client = mock_s3_client
+
+        result = downloader._check_s3_path_exists("test/path")
+
+        assert result is True
+
+    def test_check_s3_path_exists_false(self, downloader):
+        """Test S3 path existence check when path doesn't exist"""
+        mock_s3_client = Mock()
+        mock_s3_client.list_objects_v2.return_value = {}
+        downloader.s3_client = mock_s3_client
+
+        result = downloader._check_s3_path_exists("test/path")
+
+        assert result is False
+
+    def test_check_s3_path_exists_client_error(self, downloader):
+        """Test S3 path existence check when client error occurs"""
+        mock_s3_client = Mock()
+        mock_s3_client.list_objects_v2.side_effect = ClientError(
+            {"Error": {"Code": "AccessDenied"}}, "ListObjectsV2"
+        )
+        downloader.s3_client = mock_s3_client
+
+        result = downloader._check_s3_path_exists("test/path")
+
+        assert result is False
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_setup_base_assets_download_path(self, mock_boto3, downloader):
+        """Test base assets setup when assets exist in S3"""
+        downloader._check_base_assets_exist = Mock(return_value=True)
+        downloader._download_base_assets = Mock(return_value=True)
+        downloader._upload_base_assets = Mock()
+
+        result = downloader._setup_base_assets()
+
+        assert result is True
+        downloader._download_base_assets.assert_called_once()
+        downloader._upload_base_assets.assert_not_called()
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_setup_base_assets_upload_path(self, mock_boto3, downloader):
+        """Test base assets setup when assets don't exist in S3"""
+        downloader._check_base_assets_exist = Mock(return_value=False)
+        downloader._download_base_assets = Mock()
+        downloader._upload_base_assets = Mock(return_value=True)
+
+        result = downloader._setup_base_assets()
+
+        assert result is True
+        downloader._download_base_assets.assert_not_called()
+        downloader._upload_base_assets.assert_called_once()
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_apply_database_customizations_no_assets(self, mock_boto3, downloader):
+        """Test applying database customizations when no custom assets exist"""
+        downloader._check_s3_path_exists = Mock(return_value=False)
+
+        result = downloader._apply_database_customizations("test_db")
+
+        assert result is True
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_apply_database_customizations_with_assets(self, mock_boto3, downloader):
+        """Test applying database customizations when custom assets exist"""
+        # Mock that main path exists, but sub-paths don't
+        def check_path_side_effect(path):
+            return path == "assets/databases/test_db"
+
+        downloader._check_s3_path_exists = Mock(side_effect=check_path_side_effect)
+        downloader._download_s3_directory = Mock()
+
+        result = downloader._apply_database_customizations("test_db")
+
+        assert result is True
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_merge_all_metadata_no_db_metadata(self, mock_boto3, downloader, temp_directories):
+        """Test metadata merging when no database-specific metadata exists"""
+        mock_s3_client = Mock()
+        mock_s3_client.download_file.side_effect = ClientError(
+            {"Error": {"Code": "NoSuchKey"}}, "GetObject"
+        )
+        downloader.s3_client = mock_s3_client
+
+        databases = {"test_db", "another_db"}
+        result = downloader._merge_all_metadata(databases)
+
+        assert result is True
+
+        # Verify base metadata is preserved
+        with open(downloader.metadata_file) as f:
+            metadata = json.load(f)
+        assert metadata["title"] == "Test Zeeker"
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_download_complete_setup_success(self, mock_boto3, downloader):
+        """Test complete download setup process"""
+        # Mock all the individual methods
+        downloader._download_database_files = Mock(return_value={"test_db"})
+        downloader._setup_base_assets = Mock(return_value=True)
+        downloader._apply_database_customizations = Mock(return_value=True)
+        downloader._merge_all_metadata = Mock(return_value=True)
+
+        result = downloader.download_complete_setup()
+
+        assert result is True
+        downloader._download_database_files.assert_called_once()
+        downloader._setup_base_assets.assert_called_once()
+        downloader._apply_database_customizations.assert_called_once_with("test_db")
+        downloader._merge_all_metadata.assert_called_once_with({"test_db"})
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_download_complete_setup_no_databases(self, mock_boto3, downloader):
+        """Test complete download setup when no databases are found"""
+        downloader._download_database_files = Mock(return_value=set())
+
+        result = downloader.download_complete_setup()
+
+        assert result is False
+
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_download_complete_setup_base_assets_fail(self, mock_boto3, downloader):
+        """Test complete download setup when base assets setup fails"""
+        downloader._download_database_files = Mock(return_value={"test_db"})
+        downloader._setup_base_assets = Mock(return_value=False)
+
+        result = downloader.download_complete_setup()
+
+        assert result is False
+
+
+class TestDownloadFromS3Function:
+    """Test suite for the download_from_s3 function"""
+
+    @patch("scripts.download_from_s3.ZeekerS3Downloader")
+    def test_download_from_s3_success(self, mock_downloader_class):
+        """Test successful download_from_s3 function call"""
+        mock_downloader = Mock()
+        mock_downloader.download_complete_setup.return_value = True
+        mock_downloader_class.return_value = mock_downloader
+
+        # Should not raise SystemExit
+        download_from_s3()
+
+        mock_downloader_class.assert_called_once()
+        mock_downloader.download_complete_setup.assert_called_once()
+
+    @patch("scripts.download_from_s3.ZeekerS3Downloader")
+    def test_download_from_s3_failure(self, mock_downloader_class):
+        """Test download_from_s3 function when download fails"""
+        mock_downloader = Mock()
+        mock_downloader.download_complete_setup.return_value = False
+        mock_downloader_class.return_value = mock_downloader
+
+        with pytest.raises(SystemExit) as exc_info:
+            download_from_s3()
+
+        assert exc_info.value.code == 1
+
+    @patch("scripts.download_from_s3.ZeekerS3Downloader")
+    def test_download_from_s3_exception(self, mock_downloader_class):
+        """Test download_from_s3 function when exception occurs"""
+        mock_downloader_class.side_effect = Exception("Test error")
+
+        with pytest.raises(SystemExit) as exc_info:
+            download_from_s3()
+
+        assert exc_info.value.code == 1
+
+
+# Integration-style tests
+class TestIntegration:
+    """Integration tests using temporary files and mocked S3"""
+
+    @pytest.fixture
+    def full_setup(self):
+        """Full test setup with temporary directories and mocked S3"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create directory structure
+            data_dir = temp_path / "data"
+            templates_dir = temp_path / "templates"
+            static_dir = temp_path / "static"
+            plugins_dir = temp_path / "plugins"
+
+            for dir_path in [data_dir, templates_dir, static_dir, plugins_dir]:
+                dir_path.mkdir(parents=True)
+
+            # Create initial metadata
+            metadata_file = temp_path / "metadata.json"
+            initial_metadata = {
+                "title": "Test Zeeker",
+                "databases": {"*": {"allow_sql": True}},
+                "extra_css_urls": ["/static/base.css"],
+            }
+            metadata_file.write_text(json.dumps(initial_metadata, indent=2))
+
+            # Create some initial template files
+            (templates_dir / "index.html").write_text("<html>Base Index</html>")
+            (static_dir / "style.css").write_text("body { color: black; }")
+
+            yield {
+                "temp_path": temp_path,
+                "data_dir": data_dir,
+                "templates_dir": templates_dir,
+                "static_dir": static_dir,
+                "plugins_dir": plugins_dir,
+                "metadata_file": metadata_file,
+                "initial_metadata": initial_metadata,
+            }
+
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    @patch("scripts.download_from_s3.boto3.client")
+    def test_full_download_cycle(self, mock_boto3, full_setup):
+        """Test a complete download cycle with file operations"""
+        setup = full_setup
+
+        # Create downloader and override paths
+        downloader = ZeekerS3Downloader()
+        downloader.data_dir = setup["data_dir"]
+        downloader.templates_dir = setup["templates_dir"]
+        downloader.static_dir = setup["static_dir"]
+        downloader.plugins_dir = setup["plugins_dir"]
+        downloader.metadata_file = setup["metadata_file"]
+
+        # Mock S3 client responses
+        mock_s3_client = Mock()
+
+        # Mock database files list
+        mock_s3_client.get_paginator.return_value.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "latest/courts.db", "Size": 1024},
+                    {"Key": "latest/parliament.db", "Size": 2048},
+                ]
+            }
+        ]
+
+        # Mock file downloads
+        def mock_download_file(bucket, key, local_path):
+            Path(local_path).write_bytes(b"fake database content")
+
+        mock_s3_client.download_file = mock_download_file
+
+        # Mock base assets don't exist in S3
+        mock_s3_client.head_object.side_effect = ClientError(
+            {"Error": {"Code": "NoSuchKey"}}, "HeadObject"
+        )
+
+        # Mock upload operations
+        mock_s3_client.upload_file = Mock()
+
+        # Mock list operations for path checks
+        mock_s3_client.list_objects_v2.return_value = {}
+
+        downloader.s3_client = mock_s3_client
+
+        # Run the download process
+        result = downloader.download_complete_setup()
+
+        assert result is True
+
+        # Verify database files were created
+        assert (setup["data_dir"] / "courts.db").exists()
+        assert (setup["data_dir"] / "parliament.db").exists()
+
+        # Verify metadata was preserved/updated
+        with open(setup["metadata_file"]) as f:
+            final_metadata = json.load(f)
+        assert final_metadata["title"] == "Test Zeeker"
+        assert final_metadata["databases"]["*"]["allow_sql"] is True
+
+        # Verify base assets were uploaded to S3
+        assert mock_s3_client.upload_file.called
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
+
+</document_content>
+</document>
+<document index="14">
+<source>./tests/test_manage.py</source>
+<document_content>
+#!/usr/bin/env python3
+"""
+Tests for scripts/manage.py
+"""
+
+import json
+import os
+# Import the module under test
+import tempfile
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
+from click.testing import CliRunner
+
+from scripts import manage
+
+
+class TestUtilityFunctions:
+    """Test utility functions in manage.py"""
+
+    def test_calculate_directory_hash_empty_directory(self):
+        """Test hash calculation for empty directory"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = manage.calculate_directory_hash(temp_dir)
+            # Empty directory should have a hash (of no files)
+            assert isinstance(result, str)
+            assert len(result) == 32  # MD5 hex digest length
+
+    def test_calculate_directory_hash_nonexistent_directory(self):
+        """Test hash calculation for non-existent directory"""
+        result = manage.calculate_directory_hash("/nonexistent/directory")
+        assert result is None
+
+    def test_calculate_directory_hash_with_files(self):
+        """Test hash calculation with actual database files"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create test database files
+            (temp_path / "test1.db").write_bytes(b"test content 1")
+            (temp_path / "test2.db").write_bytes(b"test content 2")
+            (temp_path / "not_db.txt").write_text("ignored file")
+
+            hash1 = manage.calculate_directory_hash(temp_dir)
+
+            # Same content should produce same hash
+            hash2 = manage.calculate_directory_hash(temp_dir)
+            assert hash1 == hash2
+
+            # Changing content should change hash
+            (temp_path / "test1.db").write_bytes(b"different content")
+            hash3 = manage.calculate_directory_hash(temp_dir)
+            assert hash1 != hash3
+
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket", "AWS_REGION": "us-west-2"})
+    def test_download_from_s3_to_dir_success(self, mock_boto3):
+        """Test successful S3 download to directory"""
+        # Setup mock S3 client
+        mock_s3_client = Mock()
+        mock_boto3.return_value = mock_s3_client
+
+        # Mock paginator response
+        mock_paginator = Mock()
+        mock_s3_client.get_paginator.return_value = mock_paginator
+        mock_paginator.paginate.return_value = [
+            {
+                "Contents": [
+                    {"Key": "latest/test1.db"},
+                    {"Key": "latest/test2.db"},
+                    {"Key": "latest/not_db.txt"},  # Should be ignored
+                ]
+            }
+        ]
+
+        # Mock download_file
+        mock_s3_client.download_file = Mock()
+
+        # Setup logger
+        logger = Mock()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            result = manage.download_from_s3_to_dir(temp_dir, logger)
+
+            assert result is True
+            # Should download only .db files
+            assert mock_s3_client.download_file.call_count == 2
+
+            # Verify boto3 client was called with correct parameters
+            mock_boto3.assert_called_with(
+                "s3", region_name="us-west-2", endpoint_url=None
+            )
+
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_download_from_s3_to_dir_no_bucket(self, mock_boto3):
+        """Test S3 download when S3_BUCKET is not set"""
+        with patch.dict(os.environ, {}, clear=True):
+            logger = Mock()
+            result = manage.download_from_s3_to_dir("/tmp", logger)
+
+            assert result is False
+            logger.error.assert_called_with(
+                "S3_BUCKET environment variable is required"
+            )
+
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_download_from_s3_to_dir_exception(self, mock_boto3):
+        """Test S3 download when exception occurs"""
+        mock_boto3.side_effect = Exception("S3 connection failed")
+        logger = Mock()
+
+        result = manage.download_from_s3_to_dir("/tmp", logger)
+
+        assert result is False
+        logger.error.assert_called()
+
+    def test_setup_logging_normal(self):
+        """Test logging setup with normal verbosity"""
+        logger = manage.setup_logging(verbose=False)
+        assert logger.level >= 20  # INFO level
+
+    def test_setup_logging_verbose(self):
+        """Test logging setup with verbose mode"""
+        logger = manage.setup_logging(verbose=True)
+        assert logger.level <= 10  # DEBUG level
+
+
+class TestCliCommands:
+    """Test CLI commands using Click's test runner"""
+
+    def setup_method(self):
+        """Setup test runner for each test"""
+        self.runner = CliRunner()
+
+    def test_cli_group(self):
+        """Test main CLI group"""
+        result = self.runner.invoke(manage.cli, ["--help"])
+        assert result.exit_code == 0
+        assert "Zeeker Datasette Management Commands" in result.output
+
+    def test_cli_version(self):
+        """Test version option"""
+        result = self.runner.invoke(manage.cli, ["--version"])
+        assert result.exit_code == 0
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.calculate_directory_hash")
+    @patch("scripts.manage.download_from_s3_to_dir")
+    @patch("scripts.manage.subprocess.run")
+    @patch("scripts.manage.shutil")
+    def test_refresh_command_no_changes(
+            self,
+            mock_shutil,
+            mock_subprocess,
+            mock_download,
+            mock_calculate_hash,
+            mock_load_dotenv,
+            mock_setup_logging,
+    ):
+        """Test refresh command when no changes detected"""
+        # Setup mocks
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        mock_calculate_hash.side_effect = ["hash123", "hash123"]  # Same hash
+        mock_download.return_value = True
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock Path instance that represents the script file
+                mock_script_path = Mock()
+                mock_script_path.parent.parent = Path(temp_dir)
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+                result = self.runner.invoke(manage.refresh)
+
+                assert result.exit_code == 0
+                assert "No data changes detected" in result.output
+                # Should not restart container
+                mock_subprocess.assert_not_called()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.calculate_directory_hash")
+    @patch("scripts.manage.download_from_s3_to_dir")
+    @patch("scripts.manage.subprocess.run")
+    @patch("scripts.manage.shutil")
+    def test_refresh_command_with_changes(
+            self,
+            mock_shutil,
+            mock_subprocess,
+            mock_download,
+            mock_calculate_hash,
+            mock_load_dotenv,
+            mock_setup_logging,
+    ):
+        """Test refresh command when changes detected"""
+        # Setup mocks
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        mock_calculate_hash.side_effect = ["hash123", "hash456"]  # Different hashes
+        mock_download.return_value = True
+
+        # Mock successful subprocess run
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_subprocess.return_value = mock_result
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock Path instance that represents the script file
+                mock_script_path = Mock()
+                mock_script_path.parent.parent = Path(temp_dir)
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+
+                result = self.runner.invoke(manage.refresh)
+
+                assert result.exit_code == 0
+                # Should restart container
+                mock_subprocess.assert_called()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.calculate_directory_hash")
+    @patch("scripts.manage.download_from_s3_to_dir")
+    def test_refresh_command_force(
+            self, mock_download, mock_calculate_hash, mock_load_dotenv, mock_setup_logging
+    ):
+        """Test refresh command with force flag"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        mock_calculate_hash.return_value = "hash123"  # Same hash
+        mock_download.return_value = True
+
+        with patch("scripts.manage.subprocess.run") as mock_subprocess:
+            mock_result = Mock()
+            mock_result.returncode = 0
+            mock_subprocess.return_value = mock_result
+
+            result = self.runner.invoke(manage.refresh, ["--force"])
+
+            assert result.exit_code == 0
+            # Should still proceed even with same hash
+            mock_subprocess.assert_called()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    def test_refresh_command_download_failure(self, mock_load_dotenv, mock_setup_logging):
+        """Test refresh command when S3 download fails"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        with patch("scripts.manage.download_from_s3_to_dir", return_value=False):
+            result = self.runner.invoke(manage.refresh)
+
+            assert result.exit_code == 1
+
+    def test_status_command_no_data(self):
+        """Test status command when no data directory exists"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock Path instance that represents the script file
+                mock_script_path = Mock()
+                mock_script_path.parent.parent = Path(temp_dir)
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+
+                result = self.runner.invoke(manage.status)
+
+                assert result.exit_code == 0
+                assert "Data directory does not exist" in result.output
+
+    def test_status_command_with_data(self):
+        """Test status command with existing data"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create directory structure
+            data_dir = temp_path / "data"
+            templates_dir = temp_path / "templates"
+            static_dir = temp_path / "static"
+            metadata_file = temp_path / "metadata.json"
+
+            data_dir.mkdir()
+            templates_dir.mkdir()
+            static_dir.mkdir()
+
+            # Create test files
+            (data_dir / "test.db").write_bytes(b"test database content")
+            (templates_dir / "index.html").write_text("<html>Test</html>")
+            (static_dir / "style.css").write_text("body { color: black; }")
+            metadata_file.write_text(json.dumps({"databases": {"test": {}}}))
+
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock Path instance that represents the script file
+                mock_script_path = Mock()
+                mock_script_path.parent.parent = Path(temp_dir)
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+                result = self.runner.invoke(manage.status)
+
+                assert result.exit_code == 0
+                assert "Found 1 database file(s)" in result.output
+                assert "Found 1 template file(s)" in result.output
+                assert "Metadata loaded" in result.output
+
+    def test_status_command_docker_check(self):
+        """Test status command Docker container check"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            data_dir = temp_path / "data"
+            templates_dir = temp_path / "templates"
+            static_dir = temp_path / "static"
+            metadata_file = temp_path / "metadata.json"
+
+            data_dir.mkdir()
+            templates_dir.mkdir()
+            static_dir.mkdir()
+            metadata_file.write_text(json.dumps({"databases": {}}))
+
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock Path instance that represents the script file
+                mock_script_path = Mock()
+                mock_script_path.parent.parent = Path(temp_dir)
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+
+                with patch("scripts.manage.subprocess.run") as mock_subprocess:
+                    # Mock successful Docker check
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    mock_result.stdout = "zeeker-datasette   Up"
+                    mock_subprocess.return_value = mock_result
+
+                    result = self.runner.invoke(manage.status)
+
+                    assert result.exit_code == 0
+                    assert "Docker container is running" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})  # Add this line
+    def test_sync_assets_upload_base(self, mock_load_dotenv, mock_setup_logging):
+        """Test sync-assets command with upload-base flag"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        # Create a mock downloader
+        mock_downloader = Mock()
+        mock_downloader._upload_base_assets.return_value = True
+
+        # Create a mock module with the ZeekerS3Downloader class
+        mock_download_module = Mock()
+        mock_download_module.ZeekerS3Downloader.return_value = mock_downloader
+
+        # Patch sys.modules to handle dynamic import
+        with patch.dict('sys.modules', {'scripts.download_from_s3': mock_download_module}):
+            result = self.runner.invoke(manage.sync_assets, ["--upload-base"])
+
+            assert result.exit_code == 0
+            assert "Base assets uploaded to S3" in result.output
+            mock_downloader._upload_base_assets.assert_called_once()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})  # Add this line
+    def test_sync_assets_full_sync(self, mock_load_dotenv, mock_setup_logging):
+        """Test sync-assets command for full sync"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Create a mock downloader
+        mock_downloader = Mock()
+        mock_downloader._upload_base_assets.return_value = True
+
+        # Create a mock module with the ZeekerS3Downloader class
+        mock_download_module = Mock()
+        mock_download_module.ZeekerS3Downloader.return_value = mock_downloader
+
+        # Mock the downloader
+        with patch.dict('sys.modules', {'scripts.download_from_s3': mock_download_module}):
+            result = self.runner.invoke(manage.sync_assets)
+
+            assert result.exit_code == 0
+            assert "All assets synced from S3" in result.output
+            mock_downloader.download_complete_setup.assert_called_once()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_list_databases_command(self, mock_boto3, mock_load_dotenv, mock_setup_logging):
+        """Test list-databases command"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Mock S3 client
+        mock_s3_client = Mock()
+        mock_boto3.return_value = mock_s3_client
+
+        # Mock database files response
+        mock_s3_client.list_objects_v2.side_effect = [
+            {
+                "Contents": [
+                    {
+                        "Key": "latest/courts.db",
+                        "Size": 1024000,
+                        "LastModified": "2025-05-28T10:00:00Z",
+                    },
+                    {
+                        "Key": "latest/parliament.db",
+                        "Size": 2048000,
+                        "LastModified": "2025-05-28T11:00:00Z",
+                    },
+                ]
+            },
+            {"CommonPrefixes": [{"Prefix": "assets/databases/courts/"}]},
+        ]
+
+        # Mock database customizations response
+        mock_s3_client.list_objects_v2.return_value = {
+            "Contents": [
+                {"Key": "assets/databases/courts/metadata.json"},
+                {"Key": "assets/databases/courts/templates/custom.html"},
+            ]
+        }
+
+        result = self.runner.invoke(manage.list_databases)
+
+        assert result.exit_code == 0
+        assert "courts" in result.output
+        assert "parliament" in result.output
+        assert "Database Files" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_check_assets_command(self, mock_boto3, mock_load_dotenv, mock_setup_logging):
+        """Test check-assets command"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Mock S3 client
+        mock_s3_client = Mock()
+        mock_boto3.return_value = mock_s3_client
+
+        # Mock successful head_object calls (assets exist)
+        mock_s3_client.head_object = Mock()
+
+        # Mock list_objects_v2 for asset count
+        mock_s3_client.list_objects_v2.return_value = {
+            "Contents": [
+                {"Key": "assets/default/metadata.json"},
+                {"Key": "assets/default/templates/index.html"},
+                {"Key": "assets/default/static/css/style.css"},
+            ]
+        }
+
+        result = self.runner.invoke(manage.check_assets)
+
+        assert result.exit_code == 0
+        assert "Base Assets" in result.output
+        assert "All required base assets present" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_test_s3_connection_success(self, mock_boto3, mock_load_dotenv, mock_setup_logging):
+        """Test test-s3-connection command success"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Mock S3 client
+        mock_s3_client = Mock()
+        mock_boto3.return_value = mock_s3_client
+
+        # Mock successful S3 response
+        mock_s3_client.list_objects_v2.return_value = {
+            "Contents": [
+                {"Key": "latest/test.db"},
+                {"Key": "latest/test2.db"},
+            ]
+        }
+
+        result = self.runner.invoke(manage.test_s3_connection)
+
+        assert result.exit_code == 0
+        assert "Successfully connected to S3 bucket" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    def test_test_s3_connection_no_bucket(self, mock_load_dotenv, mock_setup_logging):
+        """Test test-s3-connection command without S3_BUCKET"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        with patch.dict(os.environ, {}, clear=True):
+            result = self.runner.invoke(manage.test_s3_connection)
+
+            assert result.exit_code == 0
+            assert "S3_BUCKET environment variable not set" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.shutil.rmtree")
+    @patch("scripts.manage.datetime")
+    def test_cleanup_command_with_backups(self, mock_datetime, mock_rmtree, mock_setup_logging):
+        """Test cleanup command with old backups"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Mock current time
+        mock_datetime.now.return_value.timestamp.return_value = 1000000
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock script path
+                mock_script_path = Mock()
+                mock_project_dir = Mock()
+                mock_script_path.parent.parent = mock_project_dir
+
+                # Create a mock backup directory
+                mock_backup_dir = Mock()
+                mock_backup_dir.is_dir.return_value = True
+                mock_stat = Mock()
+                mock_stat.st_mtime = 500000  # Old timestamp (before cutoff)
+                mock_backup_dir.stat.return_value = mock_stat
+
+                # Mock the glob to return our mock backup directory
+                mock_project_dir.glob.return_value = [mock_backup_dir]
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+
+                result = self.runner.invoke(manage.cleanup, ["--clean-backups"])
+
+                assert result.exit_code == 0
+                assert "Removed 1 old backup directories" in result.output
+                mock_rmtree.assert_called_once_with(mock_backup_dir)
+
+    def test_cleanup_command_temp_files(self):
+        """Test cleanup command for temporary files"""
+        with patch("scripts.manage.Path") as mock_path_class:
+            # Mock temp files
+            mock_temp_file = Mock()
+            mock_temp_file.is_file.return_value = True
+            mock_temp_file.unlink = Mock()
+
+            mock_path_class.return_value.glob.return_value = [mock_temp_file]
+
+            result = self.runner.invoke(manage.cleanup)
+
+            assert result.exit_code == 0
+            assert "Cleanup completed" in result.output
+
+
+class TestErrorHandling:
+    """Test error handling scenarios"""
+
+    def setup_method(self):
+        """Setup test runner for each test"""
+        self.runner = CliRunner()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    def test_refresh_command_exception_handling(self, mock_load_dotenv, mock_setup_logging):
+        """Test refresh command exception handling"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Force an exception
+        with patch("scripts.manage.calculate_directory_hash", side_effect=Exception("Test error")):
+            result = self.runner.invoke(manage.refresh)
+
+            assert result.exit_code == 1
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})  # Add this line
+    def test_sync_assets_exception_handling(self, mock_load_dotenv, mock_setup_logging):
+        """Test sync-assets command exception handling"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Create a mock downloader
+        mock_downloader = Mock()
+        mock_downloader._upload_base_assets.return_value = True
+
+        # Create a mock module with the ZeekerS3Downloader class
+        mock_download_module = Mock()
+        mock_download_module.ZeekerS3Downloader.return_value = mock_downloader
+
+        # Force an exception in the downloader
+        with patch.dict('sys.modules', {'scripts.download_from_s3': mock_download_module},
+                        side_effect=Exception("Test error")):
+            result = self.runner.invoke(manage.sync_assets)
+
+            assert result.exit_code == 0  # Function handles exceptions
+            assert "Error during asset sync" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_list_databases_exception_handling(self, mock_boto3, mock_load_dotenv, mock_setup_logging):
+        """Test list-databases command exception handling"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Force an exception
+        mock_boto3.side_effect = Exception("S3 connection failed")
+
+        result = self.runner.invoke(manage.list_databases)
+
+        assert result.exit_code == 0
+        assert "Failed to list databases" in result.output
+
+
+class TestConfigurationHandling:
+    """Test configuration and environment handling"""
+
+    def test_env_file_loading(self):
+        """Test .env file loading functionality"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_file = Path(temp_dir) / ".env"
+            env_file.write_text("TEST_VAR=test_value\n")
+
+            with patch("scripts.manage.Path") as mock_path:
+                mock_path.return_value.parent.parent = Path(temp_dir)
+
+                with patch("scripts.manage.load_dotenv") as mock_load_dotenv:
+                    runner = CliRunner()
+                    runner.invoke(manage.refresh)
+
+                    mock_load_dotenv.assert_called_with(env_file)
+
+    @patch.dict(os.environ, {"S3_ENDPOINT_URL": "https://custom.endpoint.com"})
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.boto3.client")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_custom_s3_endpoint(self, mock_boto3, mock_load_dotenv, mock_setup_logging):
+        """Test configuration with custom S3 endpoint"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        runner = CliRunner()
+        runner.invoke(manage.test_s3_connection)
+
+        # Verify boto3 was called with custom endpoint
+        mock_boto3.assert_called_with(
+            "s3",
+            region_name="us-east-1",  # Default region
+            endpoint_url="https://custom.endpoint.com",
+        )
+
+
+class TestIntegrationScenarios:
+    """Integration-style tests with realistic scenarios"""
+
+    def setup_method(self):
+        """Setup test runner for each test"""
+        self.runner = CliRunner()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.boto3.client")
+    @patch("scripts.manage.subprocess.run")
+    @patch.dict(os.environ, {"S3_BUCKET": "test-bucket"})
+    def test_full_refresh_workflow(
+            self, mock_subprocess, mock_boto3, mock_load_dotenv, mock_setup_logging
+    ):
+        """Test complete refresh workflow"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        # Mock S3 client
+        mock_s3_client = Mock()
+        mock_boto3.return_value = mock_s3_client
+        mock_s3_client.get_paginator.return_value.paginate.return_value = [
+            {"Contents": [{"Key": "latest/test.db"}]}
+        ]
+        mock_s3_client.download_file = Mock()
+
+        # Mock successful Docker restart
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_subprocess.return_value = mock_result
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
+
+            # Create an old database file
+            (data_dir / "old.db").write_bytes(b"old content")
+
+            with patch("scripts.manage.Path") as mock_path:
+                mock_path.return_value.parent.parent = temp_path
+
+                # Force different hashes to trigger update
+                with patch(
+                        "scripts.manage.calculate_directory_hash", side_effect=["hash1", "hash2"]
+                ):
+                    result = self.runner.invoke(manage.refresh, ["--verbose"])
+
+                    assert result.exit_code == 0
+                    assert "Data changes detected" in result.output
+                    assert "Container restarted successfully" in result.output
+
+    @patch("scripts.manage.setup_logging")
+    def test_status_comprehensive_check(self, mock_setup_logging):
+        """Test comprehensive status check with all components"""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create full directory structure
+            data_dir = temp_path / "data"
+            templates_dir = temp_path / "templates"
+            static_dir = temp_path / "static"
+            env_file = temp_path / ".env"
+            metadata_file = temp_path / "metadata.json"
+
+            for directory in [data_dir, templates_dir, static_dir]:
+                directory.mkdir(parents=True)
+
+            # Create test files
+            (data_dir / "courts.db").write_bytes(b"courts database")
+            (data_dir / "parliament.db").write_bytes(b"parliament database")
+
+            (templates_dir / "index.html").write_text("<html>Index</html>")
+            (templates_dir / "database-courts.html").write_text("<html>Courts</html>")
+
+            (static_dir / "style.css").write_text("body { color: black; }")
+            (static_dir / "databases" / "courts").mkdir(parents=True)
+            (static_dir / "databases" / "courts" / "custom.css").write_text(
+                "court styles"
+            )
+
+            env_file.write_text("S3_BUCKET=test-bucket\n")
+
+            metadata_file.write_text(
+                json.dumps(
+                    {
+                        "title": "Test Zeeker",
+                        "databases": {"courts": {"custom": True}, "parliament": {}},
+                    }
+                )
+            )
+
+            with patch("scripts.manage.Path") as mock_path:
+                mock_path.return_value.parent.parent = temp_path
+
+                with patch("scripts.manage.subprocess.run") as mock_subprocess:
+                    mock_result = Mock()
+                    mock_result.returncode = 0
+                    mock_result.stdout = "zeeker-datasette   Up 10 minutes"
+                    mock_subprocess.return_value = mock_result
+
+                    result = self.runner.invoke(manage.status)
+
+                    assert result.exit_code == 0
+                    assert "Found 2 database file(s)" in result.output
+                    assert "Found 2 template file(s)" in result.output
+                    assert "1 database-specific templates" in result.output
+                    assert "1 database(s) with custom assets" in result.output
+                    assert "Metadata loaded (2 database configurations)" in result.output
+                    assert "Docker container is running" in result.output
+                    assert "Environment file found" in result.output
+
+
+if __name__ == "__main__":
+    pytest.main([__file__])
+
+</document_content>
+</document>
+<document index="15">
 <source>./plugins/__init__.py</source>
 <document_content>
 
 </document_content>
 </document>
-<document index="10">
+<document index="16">
 <source>./plugins/template_filters.py</source>
 <document_content>
 """
@@ -453,7 +3429,27 @@ def prepare_jinja2_environment(env):
     return env
 </document_content>
 </document>
-<document index="11">
+<document index="17">
+<source>./scripts/__init__.py</source>
+<document_content>
+"""
+Zeeker Datasette Scripts Package
+"""
+
+try:
+    from .download_from_s3 import ZeekerS3Downloader
+    from .manage import cli
+except ImportError:
+    # Handle case where dependencies might not be available
+    ZeekerS3Downloader = None
+    cli = None
+
+__version__ = "1.0.0"
+__all__ = ['ZeekerS3Downloader', 'cli']
+
+</document_content>
+</document>
+<document index="18">
 <source>./scripts/convert_hero_image.py</source>
 <document_content>
 #!/usr/bin/env python3
@@ -602,18 +3598,23 @@ if __name__ == "__main__":
     main()
 </document_content>
 </document>
-<document index="12">
+<document index="19">
 <source>./scripts/download_from_s3.py</source>
 <document_content>
 #!/usr/bin/env python
 """
-Download SQLite databases from an S3 bucket to local storage.
+Download SQLite databases and assets from S3 with three-pass merge system.
+Enhanced version of the original script with asset management capabilities.
 """
+import json
+import logging
 import os
 import sys
-import boto3
-import logging
 from pathlib import Path
+from typing import Dict, Set
+
+import boto3
+from botocore.exceptions import ClientError
 
 # Configure logging
 logging.basicConfig(
@@ -624,40 +3625,339 @@ logging.basicConfig(
 logger = logging.getLogger("s3-downloader")
 
 
-def download_from_s3():
-    """Download all .db files from the specified S3 bucket to /data directory."""
-    # Get S3 configuration from environment variables
-    s3_bucket = os.environ.get("S3_BUCKET")
-    s3_prefix = os.environ.get("S3_PREFIX", "")
-    aws_region = os.environ.get("AWS_REGION", "us-east-1")
+class ZeekerS3Downloader:
+    """Enhanced S3 downloader with three-pass merge system for Zeeker assets."""
 
-    if not s3_bucket:
-        logger.error("S3_BUCKET environment variable is required")
-        sys.exit(1)
+    def __init__(self):
+        self.s3_bucket = os.environ.get("S3_BUCKET")
 
-    # Create data directory if it doesn't exist
-    data_dir = Path("/data")
-    data_dir.mkdir(exist_ok=True)
+        # Local paths
+        self.data_dir = Path("/data")
+        self.templates_dir = Path("/app/templates")
+        self.static_dir = Path("/app/static")
+        self.plugins_dir = Path("/app/plugins")
+        self.metadata_file = Path("/app/metadata.json")
 
-    try:
+        # S3 paths (simplified structure)
+        self.s3_databases_path = "latest"
+        self.s3_assets_default_path = "assets/default"
+        self.s3_assets_databases_path = "assets/databases"
+
+        if not self.s3_bucket:
+            logger.error("S3_BUCKET environment variable is required")
+            sys.exit(1)
+
         # Initialize S3 client
+        self.s3_client = self._setup_s3_client()
+
+    def _setup_s3_client(self):
+        """Initialize S3 client with configuration."""
         s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
-        s3 = boto3.client(
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+        return boto3.client(
             "s3",
             region_name=aws_region,
             endpoint_url=s3_endpoint_url if s3_endpoint_url else None
         )
 
-        # List objects in the bucket with the given prefix
-        logger.info(f"Listing objects in s3://{s3_bucket}/{s3_prefix}")
+    def download_complete_setup(self) -> bool:
+        """
+        Three-pass download and merge process:
+        1. Download database files
+        2. Download and merge base assets
+        3. Download and merge database-specific assets
+        """
+        try:
+            logger.info("Starting three-pass asset download and merge process")
 
-        paginator = s3.get_paginator("list_objects_v2")
-        page_iterator = paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefix)
+            # Pass 1: Download database files
+            logger.info("Pass 1: Downloading database files")
+            databases = self._download_database_files()
 
-        # Track if we found any database files
-        found_files = False
+            if not databases:
+                logger.warning("No database files found")
+                return False
 
-        # Download each .db file
+            # Pass 2: Download base assets (or upload if missing)
+            logger.info("Pass 2: Setting up base assets")
+            if not self._setup_base_assets():
+                logger.error("Failed to setup base assets")
+                return False
+
+            # Pass 3: Download and merge database-specific assets
+            logger.info("Pass 3: Applying database-specific customizations")
+            for db_name in databases:
+                self._apply_database_customizations(db_name)
+
+            # Merge all metadata
+            self._merge_all_metadata(databases)
+
+            logger.info("Asset download and merge process completed successfully")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error in download process: {e}")
+            return False
+
+    def _download_database_files(self) -> Set[str]:
+        """Download .db files and return set of database names."""
+        self.data_dir.mkdir(exist_ok=True)
+        databases = set()
+
+        try:
+            paginator = self.s3_client.get_paginator("list_objects_v2")
+            page_iterator = paginator.paginate(
+                Bucket=self.s3_bucket,
+                Prefix=self.s3_databases_path
+            )
+
+            for page in page_iterator:
+                if "Contents" not in page:
+                    continue
+
+                for obj in page["Contents"]:
+                    key = obj["Key"]
+                    if not key.endswith(".db"):
+                        continue
+
+                    filename = Path(key).name
+                    db_name = filename.replace(".db", "")
+                    local_path = self.data_dir / filename
+
+                    logger.info(f"Downloading database: {key} → {local_path}")
+                    self.s3_client.download_file(self.s3_bucket, key, str(local_path))
+                    databases.add(db_name)
+
+            logger.info(f"Downloaded {len(databases)} database files: {databases}")
+            return databases
+
+        except Exception as e:
+            logger.error(f"Error downloading database files: {e}")
+            return set()
+
+    def _setup_base_assets(self) -> bool:
+        """Download base assets from S3, or upload local assets if missing."""
+        try:
+            # Check if base assets exist in S3
+            if self._check_base_assets_exist():
+                logger.info("Base assets found in S3, downloading...")
+                return self._download_base_assets()
+            else:
+                logger.info("Base assets not found in S3, uploading local assets...")
+                return self._upload_base_assets()
+
+        except Exception as e:
+            logger.error(f"Error setting up base assets: {e}")
+            return False
+
+    def _check_base_assets_exist(self) -> bool:
+        """Check if base assets exist in S3."""
+        required_files = [
+            f"{self.s3_assets_default_path}/metadata.json",
+            f"{self.s3_assets_default_path}/templates/index.html",
+            f"{self.s3_assets_default_path}/static/css/zeeker-theme.css"
+        ]
+
+        for file_key in required_files:
+            try:
+                self.s3_client.head_object(Bucket=self.s3_bucket, Key=file_key)
+            except ClientError:
+                logger.info(f"Base asset not found: {file_key}")
+                return False
+
+        return True
+
+    def _download_base_assets(self) -> bool:
+        """Download base assets from S3."""
+        try:
+            # Download base templates
+            self._download_s3_directory(
+                f"{self.s3_assets_default_path}/templates/",
+                self.templates_dir
+            )
+
+            # Download base static files
+            self._download_s3_directory(
+                f"{self.s3_assets_default_path}/static/",
+                self.static_dir
+            )
+
+            # Download base plugins
+            self._download_s3_directory(
+                f"{self.s3_assets_default_path}/plugins/",
+                self.plugins_dir
+            )
+
+            # Download base metadata
+            self.s3_client.download_file(
+                self.s3_bucket,
+                f"{self.s3_assets_default_path}/metadata.json",
+                str(self.metadata_file)
+            )
+
+            logger.info("Successfully downloaded base assets from S3")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error downloading base assets: {e}")
+            return False
+
+    def _upload_base_assets(self) -> bool:
+        """Upload local assets to S3 as base assets."""
+        try:
+            # Upload templates
+            if self.templates_dir.exists():
+                self._upload_directory_to_s3(
+                    self.templates_dir,
+                    f"{self.s3_assets_default_path}/templates/"
+                )
+
+            # Upload static files
+            if self.static_dir.exists():
+                self._upload_directory_to_s3(
+                    self.static_dir,
+                    f"{self.s3_assets_default_path}/static/"
+                )
+
+            # Upload plugins
+            if self.plugins_dir.exists():
+                self._upload_directory_to_s3(
+                    self.plugins_dir,
+                    f"{self.s3_assets_default_path}/plugins/"
+                )
+
+            # Upload metadata
+            if self.metadata_file.exists():
+                self.s3_client.upload_file(
+                    str(self.metadata_file),
+                    self.s3_bucket,
+                    f"{self.s3_assets_default_path}/metadata.json"
+                )
+
+            logger.info("Successfully uploaded base assets to S3")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error uploading base assets: {e}")
+            return False
+
+    def _apply_database_customizations(self, db_name: str) -> bool:
+        """Download and apply database-specific customizations."""
+        try:
+            db_assets_path = f"{self.s3_assets_databases_path}/{db_name}"
+
+            # Check if database has custom assets
+            if not self._check_s3_path_exists(db_assets_path):
+                logger.info(f"No custom assets found for database: {db_name}")
+                return True
+
+            logger.info(f"Applying customizations for database: {db_name}")
+
+            # Download custom templates (overlay on base templates)
+            templates_path = f"{db_assets_path}/templates/"
+            if self._check_s3_path_exists(templates_path):
+                self._download_s3_directory(templates_path, self.templates_dir)
+                logger.info(f"Applied custom templates for {db_name}")
+
+            # Download custom static files
+            static_path = f"{db_assets_path}/static/"
+            if self._check_s3_path_exists(static_path):
+                # Create database-specific static directory
+                db_static_dir = self.static_dir / "databases" / db_name
+                db_static_dir.mkdir(parents=True, exist_ok=True)
+                self._download_s3_directory(static_path, db_static_dir)
+                logger.info(f"Applied custom static files for {db_name}")
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error applying customizations for {db_name}: {e}")
+            return False
+
+    def _merge_all_metadata(self, databases: Set[str]) -> bool:
+        """Merge base metadata with database-specific metadata."""
+        try:
+            # Load base metadata
+            base_metadata = {}
+            if self.metadata_file.exists():
+                with open(self.metadata_file, 'r') as f:
+                    base_metadata = json.load(f)
+
+            # Initialize merged metadata with base
+            merged_metadata = base_metadata.copy()
+
+            # Merge database-specific metadata
+            for db_name in databases:
+                db_metadata_key = f"{self.s3_assets_databases_path}/{db_name}/metadata.json"
+
+                try:
+                    # Download database metadata to temp file
+                    temp_metadata = Path(f"/tmp/{db_name}_metadata.json")
+                    self.s3_client.download_file(
+                        self.s3_bucket,
+                        db_metadata_key,
+                        str(temp_metadata)
+                    )
+
+                    # Load and merge
+                    with open(temp_metadata, 'r') as f:
+                        db_metadata = json.load(f)
+
+                    merged_metadata = self._deep_merge_metadata(merged_metadata, db_metadata)
+                    logger.info(f"Merged metadata for database: {db_name}")
+
+                    # Clean up temp file
+                    temp_metadata.unlink()
+
+                except ClientError:
+                    logger.info(f"No custom metadata found for database: {db_name}")
+                    continue
+
+            # Write merged metadata
+            with open(self.metadata_file, 'w') as f:
+                json.dump(merged_metadata, f, indent=2)
+
+            logger.info("Successfully merged all metadata files")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error merging metadata: {e}")
+            return False
+
+    def _deep_merge_metadata(self, base: Dict, overlay: Dict) -> Dict:
+        """Deep merge two metadata dictionaries with conflict resolution."""
+        result = base.copy()
+
+        for key, value in overlay.items():
+            if key in ["extra_css_urls", "extra_js_urls"]:
+                # Always append, never replace
+                result[key] = result.get(key, []) + value
+            elif key == "databases":
+                # Merge database configs without overriding base "*" settings
+                result[key] = result.get(key, {})
+                for db_name, db_config in value.items():
+                    if db_name != "*":  # Never override global defaults
+                        result[key][db_name] = db_config
+            elif key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                # Deep merge nested dictionaries
+                result[key] = self._deep_merge_metadata(result[key], value)
+            else:
+                # For other keys, database-specific takes precedence
+                result[key] = value
+
+        return result
+
+    def _download_s3_directory(self, s3_prefix: str, local_dir: Path) -> None:
+        """Download entire S3 directory to local path."""
+        local_dir.mkdir(parents=True, exist_ok=True)
+
+        paginator = self.s3_client.get_paginator("list_objects_v2")
+        page_iterator = paginator.paginate(
+            Bucket=self.s3_bucket,
+            Prefix=s3_prefix
+        )
+
         for page in page_iterator:
             if "Contents" not in page:
                 continue
@@ -665,23 +3965,72 @@ def download_from_s3():
             for obj in page["Contents"]:
                 key = obj["Key"]
 
-                # Only download .db files
-                if not key.endswith(".db"):
+                # Skip files that don't match the prefix (defensive programming)
+                if not key.startswith(s3_prefix):
                     continue
 
-                found_files = True
-                filename = os.path.basename(key)
-                local_path = data_dir / filename
+                # Skip directories
+                if key.endswith("/"):
+                    continue
 
-                logger.info(f"Downloading {key} to {local_path}")
-                s3.download_file(s3_bucket, key, str(local_path))
-                logger.info(f"Successfully downloaded {filename}")
+                # Calculate relative path
+                relative_path = key[len(s3_prefix):].lstrip("/")
+                if not relative_path:
+                    continue
 
-        if not found_files:
-            logger.warning(f"No .db files found in s3://{s3_bucket}/{s3_prefix}")
+                local_file = local_dir / relative_path
+                local_file.parent.mkdir(parents=True, exist_ok=True)
+
+                self.s3_client.download_file(self.s3_bucket, key, str(local_file))
+                logger.debug(f"Downloaded: {key} → {local_file}")
+
+    def _upload_directory_to_s3(self, local_dir: Path, s3_prefix: str) -> None:
+        """Upload entire local directory to S3."""
+        for file_path in local_dir.rglob("*"):
+            if file_path.is_file():
+                relative_path = file_path.relative_to(local_dir)
+                s3_key = f"{s3_prefix}{relative_path}".replace("\\", "/")
+
+                self.s3_client.upload_file(
+                    str(file_path),
+                    self.s3_bucket,
+                    s3_key
+                )
+                logger.debug(f"Uploaded: {file_path} → {s3_key}")
+
+    def _check_s3_path_exists(self, s3_prefix: str) -> bool:
+        """Check if S3 path exists (has any objects)."""
+        try:
+            response = self.s3_client.list_objects_v2(
+                Bucket=self.s3_bucket,
+                Prefix=s3_prefix,
+                MaxKeys=1
+            )
+            return "Contents" in response and len(response["Contents"]) > 0
+        except ClientError:
+            return False
+
+
+def download_from_s3():
+    """
+    Main download function called by the Docker entrypoint.
+    Enhanced with three-pass merge system while maintaining the same interface.
+    """
+    try:
+        # Initialize the enhanced downloader
+        downloader = ZeekerS3Downloader()
+
+        # Run the complete download and merge process
+        success = downloader.download_complete_setup()
+
+        if not success:
+            logger.error("Failed to download and merge assets")
+            sys.exit(1)
+
+        logger.info("Successfully completed S3 download and asset merge")
 
     except Exception as e:
-        logger.error(f"Error downloading files: {e}")
+        logger.error(f"Error in download process: {e}")
         sys.exit(1)
 
 
@@ -689,31 +4038,51 @@ if __name__ == "__main__":
     download_from_s3()
 </document_content>
 </document>
-<document index="13">
+<document index="20">
 <source>./scripts/manage.py</source>
 <document_content>
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # /// script
 # dependencies = [
 #     "boto3>=1.28.0",
-#     "click>=8.1.3", 
+#     "click>=8.1.3",
 #     "python-dotenv>=1.0.0",
 # ]
 # ///
 """
-Management commands for zeeker-datasette with inline dependencies
+Management commands for zeeker-datasette with enhanced asset management
 """
 import hashlib
+import json
 import logging
 import os
 import shutil
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import boto3
 import click
 from dotenv import load_dotenv
+
+
+# DOCKER COMPATIBILITY: Smart import handling
+def setup_imports():
+    """Setup imports to work both as package and direct script"""
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
+
+setup_imports()
+
+# Replace the dynamic import section
+try:
+    from scripts.download_from_s3 import ZeekerS3Downloader
+except ImportError:
+    from download_from_s3 import ZeekerS3Downloader
 
 
 def setup_logging(verbose=False):
@@ -727,7 +4096,9 @@ def setup_logging(verbose=False):
             logging.StreamHandler(),
         ],
     )
-    return logging.getLogger("datasette-refresh")
+    logger = logging.getLogger("datasette-refresh")
+    logger.setLevel(level)
+    return logger
 
 
 def calculate_directory_hash(directory):
@@ -751,7 +4122,6 @@ def calculate_directory_hash(directory):
 def download_from_s3_to_dir(target_dir, logger):
     """Download databases from S3 to specific directory"""
     s3_bucket = os.environ.get("S3_BUCKET")
-    s3_prefix = os.environ.get("S3_PREFIX", "")
     aws_region = os.environ.get("AWS_REGION", "us-east-1")
 
     if not s3_bucket:
@@ -769,10 +4139,10 @@ def download_from_s3_to_dir(target_dir, logger):
             endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
         )
 
-        logger.info(f"Downloading from s3://{s3_bucket}/{s3_prefix}")
+        logger.info(f"Downloading from s3://{s3_bucket}/latest")
 
         paginator = s3.get_paginator("list_objects_v2")
-        page_iterator = paginator.paginate(Bucket=s3_bucket, Prefix=s3_prefix)
+        page_iterator = paginator.paginate(Bucket=s3_bucket, Prefix="latest")
 
         found_files = False
         for page in page_iterator:
@@ -792,7 +4162,7 @@ def download_from_s3_to_dir(target_dir, logger):
                 s3.download_file(s3_bucket, key, str(local_path))
 
         if not found_files:
-            logger.warning(f"No .db files found in s3://{s3_bucket}/{s3_prefix}")
+            logger.warning(f"No .db files found in s3://{s3_bucket}/latest")
 
         return True
 
@@ -802,7 +4172,7 @@ def download_from_s3_to_dir(target_dir, logger):
 
 
 @click.group()
-@click.version_option()
+@click.version_option(version="`1.0.0", prog_name="zeeker-manage")
 def cli():
     """Zeeker Datasette Management Commands"""
     pass
@@ -828,6 +4198,7 @@ def refresh(force, no_restart, verbose, staging_dir):
         data_dir = project_dir / "data"
         staging_path = Path(staging_dir)
 
+        click.echo("Starting Datasette data refresh...")
         logger.info("Starting Datasette data refresh")
 
         # Create directories
@@ -839,20 +4210,25 @@ def refresh(force, no_restart, verbose, staging_dir):
         logger.debug(f"Current data hash: {current_hash}")
 
         # Download fresh data
+        click.echo("Downloading fresh data from S3...")
         logger.info("Downloading fresh data from S3...")
         if not download_from_s3_to_dir(staging_path, logger):
-            logger.error("Failed to download data from S3")
-            return False
+            error_msg = "Failed to download data from S3"
+            logger.error(error_msg)
+            click.echo(f"❌ {error_msg}")
+            raise click.Abort()
 
         # Calculate new hash
         new_hash = calculate_directory_hash(staging_path)
         logger.debug(f"New data hash: {new_hash}")
 
         if not force and current_hash == new_hash:
+            click.echo("No data changes detected, skipping update")
             logger.info("No data changes detected, skipping update")
             shutil.rmtree(staging_path)
-            return True
+            return
 
+        click.echo("Data changes detected, updating...")
         logger.info("Data changes detected, updating...")
 
         # Backup current data
@@ -873,6 +4249,7 @@ def refresh(force, no_restart, verbose, staging_dir):
 
         # Restart container unless disabled
         if not no_restart:
+            click.echo("Restarting Docker container...")
             logger.info("Restarting Docker container...")
             result = subprocess.run(
                 ["docker", "compose", "restart", "zeeker-datasette"],
@@ -882,17 +4259,19 @@ def refresh(force, no_restart, verbose, staging_dir):
             )
 
             if result.returncode != 0:
+                click.echo(f"Failed to restart container: {result.stderr}")
                 logger.error(f"Failed to restart container: {result.stderr}")
-                return False
+                raise click.Abort()
 
+            click.echo("Container restarted successfully")
             logger.info("Container restarted successfully")
 
+        click.echo("Datasette refresh completed successfully")
         logger.info("Datasette refresh completed successfully")
-        return True
 
     except Exception as e:
         logger.error(f"Error during refresh: {e}", exc_info=True)
-        return False
+        raise click.Abort()
 
 
 @cli.command()
@@ -900,6 +4279,9 @@ def status():
     """Show current status of data and services"""
     project_dir = Path(__file__).parent.parent
     data_dir = project_dir / "data"
+    templates_dir = project_dir / "templates"
+    static_dir = project_dir / "static"
+    metadata_file = project_dir / "metadata.json"
 
     click.echo("=== Zeeker Datasette Status ===")
 
@@ -917,6 +4299,45 @@ def status():
             size = db_file.stat().st_size / (1024 * 1024)  # MB
             mtime = datetime.fromtimestamp(db_file.stat().st_mtime)
             click.echo(f"   📁 {db_file.name} ({size:.1f}MB, modified: {mtime})")
+
+    # Check templates
+    if templates_dir.exists():
+        template_files = list(templates_dir.rglob("*.html"))
+        click.echo(f"✅ Found {len(template_files)} template file(s)")
+
+        # Check for database-specific templates
+        db_templates = [t for t in template_files if "database-" in t.name or "table-" in t.name]
+        if db_templates:
+            click.echo(f"   📄 {len(db_templates)} database-specific templates")
+    else:
+        click.echo("❌ Templates directory not found")
+
+    # Check static files
+    if static_dir.exists():
+        static_files = list(static_dir.rglob("*"))
+        static_files = [f for f in static_files if f.is_file()]
+        click.echo(f"✅ Found {len(static_files)} static file(s)")
+
+        # Check for database-specific static files
+        db_static_dir = static_dir / "databases"
+        if db_static_dir.exists():
+            db_dirs = [d for d in db_static_dir.iterdir() if d.is_dir()]
+            click.echo(f"   🎨 {len(db_dirs)} database(s) with custom assets")
+    else:
+        click.echo("❌ Static directory not found")
+
+    # Check metadata
+    if metadata_file.exists():
+        try:
+            with open(metadata_file) as f:
+                metadata = json.load(f)
+
+            db_count = len(metadata.get("databases", {}))
+            click.echo(f"✅ Metadata loaded ({db_count} database configurations)")
+        except Exception as e:
+            click.echo(f"❌ Error reading metadata: {e}")
+    else:
+        click.echo("❌ Metadata file not found")
 
     # Check Docker container
     try:
@@ -941,13 +4362,403 @@ def status():
         click.echo("❌ No .env file found")
 
 
+@cli.command()
+@click.option("--upload-base", is_flag=True, help="Upload base assets to S3")
+@click.option("--force", is_flag=True, help="Force asset sync even if no changes detected")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def sync_assets(upload_base, force, verbose):
+    """Sync base assets between local and S3"""
+    logger = setup_logging(verbose)
+
+    # Load environment variables
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+
+    try:
+        project_dir = Path(__file__).parent.parent
+
+        if upload_base:
+            click.echo("Uploading base assets to S3...")
+            logger.info("Uploading base assets to S3...")
+            # Import at function level to ensure proper scoping
+            try:
+                # First try direct import as it might be in the global scope
+                from scripts.download_from_s3 import ZeekerS3Downloader
+            except ImportError:
+                # Fall back to relative import
+                sys.path.append(str(project_dir / "scripts"))
+                from download_from_s3 import ZeekerS3Downloader
+
+            downloader = ZeekerS3Downloader()
+            success = downloader._upload_base_assets()
+
+            if success:
+                logger.info("✅ Successfully uploaded base assets to S3")
+                click.echo("✅ Base assets uploaded to S3")
+            else:
+                logger.error("❌ Failed to upload base assets")
+                click.echo("❌ Failed to upload base assets")
+        else:
+            click.echo("Performing full asset sync...")
+            logger.info("Performing full asset sync...")
+            # Import and use the enhanced asset manager
+            sys.path.append(str(project_dir / "scripts"))
+            from download_from_s3 import ZeekerS3Downloader
+
+            downloader = ZeekerS3Downloader()
+            success = downloader.download_complete_setup()
+
+            if success:
+                logger.info("✅ Successfully synced all assets")
+                click.echo("✅ All assets synced from S3")
+            else:
+                logger.error("❌ Failed to sync assets")
+                click.echo("❌ Failed to sync assets")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Error during asset sync: {e}", exc_info=True)
+        click.echo(f"❌ Error during asset sync: {e}")
+        return False
+
+
+@cli.command()
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def list_databases(verbose):
+    """List deployed databases in S3"""
+    logger = setup_logging(verbose)
+
+    # Load environment variables
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+
+    s3_bucket = os.environ.get("S3_BUCKET")
+    if not s3_bucket:
+        click.echo("❌ S3_BUCKET environment variable not set")
+        return
+
+    try:
+        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+        s3 = boto3.client(
+            "s3",
+            region_name=aws_region,
+            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
+        )
+
+        click.echo(f"📊 Databases in S3 bucket: {s3_bucket}")
+        click.echo()
+
+        # List database files in latest/
+        click.echo("🗄️  Database Files (latest/):")
+        response = s3.list_objects_v2(Bucket=s3_bucket, Prefix="latest/")
+
+        db_files = []
+        if "Contents" in response:
+            for obj in response["Contents"]:
+                key = obj["Key"]
+                if key.endswith(".db"):
+                    filename = Path(key).name
+                    db_name = filename.replace(".db", "")
+                    size = obj["Size"] / (1024 * 1024)  # MB
+
+                    # Handle LastModified by converting it to string no matter what it is
+                    try:
+                        if hasattr(obj["LastModified"], "strftime"):
+                            # It's a datetime object
+                            modified_str = obj["LastModified"].strftime("%Y-%m-%d %H:%M:%S")
+                        else:
+                            # It's a string or something else
+                            modified_str = str(obj["LastModified"])
+                    except (AttributeError, KeyError, Exception):
+                        # Fallback for any other case
+                        modified_str = "unknown date"
+
+                    db_files.append((db_name, filename, size, modified_str))
+
+        if db_files:
+            for db_name, filename, size, modified in db_files:
+                click.echo(f"   📁 {db_name:<15} ({filename}, {size:.1f}MB, {modified})")
+        else:
+            click.echo("   No database files found")
+
+        click.echo()
+
+        # List database customizations in assets/databases/
+        click.echo("🎨 Database Customizations (assets/databases/):")
+
+        try:
+            response = s3.list_objects_v2(Bucket=s3_bucket, Prefix="assets/databases/", Delimiter="/")
+
+            custom_dbs = []
+            if "CommonPrefixes" in response:
+                for prefix in response["CommonPrefixes"]:
+                    db_path = prefix["Prefix"]
+                    db_name = db_path.replace("assets/databases/", "").rstrip("/")
+                    if db_name:
+                        custom_dbs.append(db_name)
+
+                        # Count assets for this database
+                        try:
+                            db_response = s3.list_objects_v2(Bucket=s3_bucket, Prefix=db_path)
+                            asset_count = len(db_response.get("Contents", []))
+                            if asset_count > 0:
+                                asset_count -= 1  # Subtract directory itself
+
+                            # Check for metadata
+                            has_metadata = False
+                            has_templates = False
+                            has_static = False
+
+                            if "Contents" in db_response:
+                                for obj in db_response["Contents"]:
+                                    if obj["Key"].endswith("metadata.json"):
+                                        has_metadata = True
+                                    elif "/templates/" in obj["Key"]:
+                                        has_templates = True
+                                    elif "/static/" in obj["Key"]:
+                                        has_static = True
+
+                            # Build status indicators
+                            status = []
+                            if has_metadata:
+                                status.append("📄 metadata")
+                            if has_templates:
+                                status.append("🎭 templates")
+                            if has_static:
+                                status.append("🎨 static")
+
+                            status_str = ", ".join(status) if status else "no assets"
+                            click.echo(f"   🎯 {db_name:<15} ({asset_count} files: {status_str})")
+                        except Exception as e:
+                            click.echo(f"   🎯 {db_name:<15} (error counting assets: {e})")
+
+            if not custom_dbs:
+                click.echo("   No database customizations found")
+
+            click.echo()
+
+            # Summary
+            click.echo("📋 Summary:")
+            click.echo(f"   • {len(db_files)} database file(s) deployed")
+            click.echo(f"   • {len(custom_dbs)} database(s) with custom assets")
+
+            # Check if all deployed databases have customizations
+            db_names = {db[0] for db in db_files}
+            custom_names = set(custom_dbs)
+
+            uncustomized = db_names - custom_names
+            if uncustomized:
+                click.echo(f"   • {len(uncustomized)} database(s) using default assets only: {', '.join(uncustomized)}")
+
+            # Check for customizations without databases
+            orphaned = custom_names - db_names
+            if orphaned:
+                click.echo(f"   ⚠️  {len(orphaned)} customization(s) without database files: {', '.join(orphaned)}")
+        except Exception as e:
+            click.echo(f"   Error listing customizations: {e}")
+            logger.error(f"Error listing customizations: {e}")
+
+    except Exception as e:
+        click.echo(f"❌ Failed to list databases: {e}")
+        logger.error(f"Failed to list databases: {e}")
+
+
+@cli.command()
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def check_assets(verbose):
+    """Check status of base and database assets in S3"""
+    logger = setup_logging(verbose)
+
+    # Load environment variables
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+
+    s3_bucket = os.environ.get("S3_BUCKET")
+    if not s3_bucket:
+        click.echo("❌ S3_BUCKET environment variable not set")
+        return
+
+    try:
+        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+        s3 = boto3.client(
+            "s3",
+            region_name=aws_region,
+            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
+        )
+
+        click.echo(f"🔍 Checking assets in S3 bucket: {s3_bucket}")
+        click.echo()
+
+        # Check base assets
+        click.echo("🏗️  Base Assets (assets/default/):")
+
+        required_base_assets = [
+            "assets/default/metadata.json",
+            "assets/default/templates/index.html",
+            "assets/default/templates/database.html",
+            "assets/default/templates/table.html",
+            "assets/default/static/css/zeeker-theme.css",
+            "assets/default/static/js/zeeker-enhanced.js"
+        ]
+
+        missing_assets = []
+        for asset in required_base_assets:
+            try:
+                s3.head_object(Bucket=s3_bucket, Key=asset)
+                click.echo(f"   ✅ {asset}")
+            except Exception:
+                click.echo(f"   ❌ {asset}")
+                missing_assets.append(asset)
+
+        if missing_assets:
+            click.echo()
+            click.echo("⚠️  Missing base assets detected!")
+            click.echo("   Run: uv run scripts/manage.py sync-assets --upload-base")
+        else:
+            click.echo("   ✅ All required base assets present")
+
+        click.echo()
+
+        # Check for all assets in default
+        response = s3.list_objects_v2(Bucket=s3_bucket, Prefix="assets/default/")
+        if "Contents" in response:
+            total_base_assets = len(response["Contents"])
+            click.echo(f"📊 Total base assets: {total_base_assets} files")
+
+            # Show asset categories
+            templates = sum(1 for obj in response["Contents"] if "/templates/" in obj["Key"])
+            static = sum(1 for obj in response["Contents"] if "/static/" in obj["Key"])
+            plugins = sum(1 for obj in response["Contents"] if "/plugins/" in obj["Key"])
+
+            click.echo(f"   • {templates} template files")
+            click.echo(f"   • {static} static files")
+            click.echo(f"   • {plugins} plugin files")
+        else:
+            click.echo("❌ No base assets found - run sync-assets --upload-base")
+
+    except Exception as e:
+        click.echo(f"❌ Failed to check assets: {e}")
+        logger.error(f"Failed to check assets: {e}")
+
+
+@cli.command()
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def test_s3_connection(verbose):
+    """Test S3 connection and bucket access"""
+    logger = setup_logging(verbose)
+
+    # Load environment variables
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+
+    s3_bucket = os.environ.get("S3_BUCKET")
+    if not s3_bucket:
+        click.echo("❌ S3_BUCKET environment variable not set")
+        return
+
+    try:
+        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+        aws_region = os.environ.get("AWS_REGION", "us-east-1")
+
+        s3 = boto3.client(
+            "s3",
+            region_name=aws_region,
+            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
+        )
+
+        # Test bucket access
+        click.echo(f"Testing connection to bucket: {s3_bucket}")
+
+        # List objects in latest/ directory
+        response = s3.list_objects_v2(Bucket=s3_bucket, Prefix="latest", MaxKeys=5)
+
+        if "Contents" in response:
+            click.echo("✅ Successfully connected to S3 bucket")
+            click.echo(f"Found {len(response['Contents'])} objects in latest/:")
+            for obj in response["Contents"]:
+                click.echo(f"  - {obj['Key']}")
+        else:
+            click.echo("✅ Connected to S3 but no objects found in latest/")
+
+        # Test assets directory
+        response = s3.list_objects_v2(Bucket=s3_bucket, Prefix="assets/", MaxKeys=5)
+        if "Contents" in response:
+            click.echo(f"Found {len(response['Contents'])} objects in assets/:")
+            for obj in response["Contents"]:
+                click.echo(f"  - {obj['Key']}")
+        else:
+            click.echo("No objects found in assets/ directory")
+
+    except Exception as e:
+        click.echo(f"❌ Failed to connect to S3: {e}")
+        logger.error(f"S3 connection test failed: {e}")
+
+
+@cli.command()
+@click.option("--clean-backups", is_flag=True, help="Remove old backup directories")
+@click.option("--keep-days", default=7, help="Number of days of backups to keep")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def cleanup(clean_backups, keep_days, verbose):
+    """Clean up old files and backups"""
+    logger = setup_logging(verbose)
+    project_dir = Path(__file__).parent.parent
+
+    try:
+        if clean_backups:
+            logger.info(f"Cleaning up backups older than {keep_days} days")
+
+            # Find old backup directories
+            backup_pattern = "data.backup.*"
+            cutoff_time = datetime.now().timestamp() - (keep_days * 24 * 60 * 60)
+
+            removed_count = 0
+            for backup_dir in project_dir.glob(backup_pattern):
+                if backup_dir.is_dir() and backup_dir.stat().st_mtime < cutoff_time:
+                    logger.info(f"Removing old backup: {backup_dir}")
+                    shutil.rmtree(backup_dir)
+                    removed_count += 1
+
+            click.echo(f"✅ Removed {removed_count} old backup directories")
+
+        # Clean up temporary files
+        temp_files = list(Path("/tmp").glob("*datasette*"))
+        temp_files.extend(list(Path("/tmp").glob("*_metadata.json")))
+
+        removed_temp = 0
+        for temp_file in temp_files:
+            try:
+                if temp_file.is_file():
+                    temp_file.unlink()
+                elif temp_file.is_dir():
+                    shutil.rmtree(temp_file)
+                removed_temp += 1
+            except Exception as e:
+                logger.debug(f"Could not remove {temp_file}: {e}")
+
+        if removed_temp > 0:
+            click.echo(f"✅ Cleaned up {removed_temp} temporary files")
+
+        click.echo("✅ Cleanup completed")
+
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}", exc_info=True)
+
+
 if __name__ == "__main__":
     cli()
-EOF
 
 </document_content>
 </document>
-<document index="14">
+<document index="21">
 <source>./templates/database.html</source>
 <document_content>
 {% extends "default:database.html" %}
@@ -1262,7 +5073,7 @@ EOF
 {% endblock %}
 </document_content>
 </document>
-<document index="15">
+<document index="22">
 <source>./templates/index.html</source>
 <document_content>
 {% extends "default:index.html" %}
@@ -1565,7 +5376,7 @@ curl "https://data.zeeker.sg/courts/supreme_court.json?_shape=array"</code></pre
 {% endblock %}
 </document_content>
 </document>
-<document index="16">
+<document index="23">
 <source>./templates/query.html</source>
 <document_content>
 {% extends "default:query.html" %}
@@ -1984,7 +5795,7 @@ if (textarea) {
 {% endblock %}
 </document_content>
 </document>
-<document index="17">
+<document index="24">
 <source>./templates/row.html</source>
 <document_content>
 {% extends "default:row.html" %}
@@ -2165,7 +5976,7 @@ if (textarea) {
 {% endblock %}
 </document_content>
 </document>
-<document index="18">
+<document index="25">
 <source>./templates/table.html</source>
 <document_content>
 {% extends "default:table.html" %}
@@ -2328,7 +6139,7 @@ if (textarea) {
 {% endblock %}
 </document_content>
 </document>
-<document index="19">
+<document index="26">
 <source>./templates/pages/about.html</source>
 <document_content>
 <!DOCTYPE html>
@@ -2894,7 +6705,7 @@ if (textarea) {
 </html>
 </document_content>
 </document>
-<document index="20">
+<document index="27">
 <source>./templates/pages/sources.html</source>
 <document_content>
 <!DOCTYPE html>
@@ -3610,7 +7421,7 @@ if (textarea) {
 </html>
 </document_content>
 </document>
-<document index="21">
+<document index="28">
 <source>./static/js/zeeker-enhanced.js</source>
 <document_content>
 /**
@@ -3939,7 +7750,7 @@ updateViewportHeight();
 new ZeekerEnhancer();
 </document_content>
 </document>
-<document index="22">
+<document index="29">
 <source>./static/css/zeeker-theme.css</source>
 <document_content>
 /*
@@ -4210,50 +8021,50 @@ main:not(.page-home main) {
     z-index: 1;
 }
 
-.hero-background-animated {
+.hero-background-image {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background-image: url('/static/images/supcourt-sg.png');
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;  /* Use object-fit instead of background-size */
+    object-position: center;
     opacity: 0;
     filter: hue-rotate(180deg) brightness(0.7) contrast(1.2);
     transition: opacity 1s ease-in-out;
-    transform: translateZ(0) scale(1.05);
+    transform: translateZ(0);
     backface-visibility: hidden;
 }
-
-.hero-background-animated.loading {
+.hero-background-image.loading {
     opacity: 0;
     background-color: var(--color-bg-tertiary);
 }
 
-.hero-background-animated.loaded {
+.hero-background-image.loaded {
     opacity: 0.3;
     animation: heroFloat 25s ease-in-out infinite;
 }
 
-.hero-background-animated.error {
+.hero-background-image.error {
     opacity: 0.2;
     background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 50%, #2a2a2a 100%);
 }
 
+/* Update the keyframes for img element */
 @keyframes heroFloat {
     0%, 100% {
-        transform: translateZ(0) scale(1.05) translateY(0px);
+        transform: translateZ(0) translateY(0px) scale(1);
     }
     25% {
-        transform: translateZ(0) scale(1.06) translateY(-15px);
+        transform: translateZ(0) translateY(-8px) scale(1.01);
     }
     50% {
-        transform: translateZ(0) scale(1.07) translateY(-10px);
+        transform: translateZ(0) translateY(-5px) scale(1.02);
     }
     75% {
-        transform: translateZ(0) scale(1.06) translateY(-20px);
+        transform: translateZ(0) translateY(-12px) scale(1.01);
     }
 }
 

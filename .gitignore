@@ -42,6 +42,7 @@ docker-compose.override.yml
 
 # Data files
 /data/
+/data.*/
 *.db
 *.sqlite
 *.sqlite3
