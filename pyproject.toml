@@ -9,6 +9,7 @@ dependencies = [
     "datasette-search-all>=1.1.4",
     "datasette==0.65.1",
     "python-dotenv>=1.0.0",
+    "pyyaml>=6.0.2",
 ]
 
 [dependency-groups]

@@ -4,9 +4,9 @@
   "license": "CC-BY-4.0",
   "license_url": "https://creativecommons.org/licenses/by/4.0/",
   "source": "Various Singapore legal sources",
-  "source_url": "https://data.zeeker.sg/templates/pages/sources",
-  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training with a cutting-edge interface designed for legal professionals",
-  "about_url": "https://data.zeeker.sg/templates/pages/about",
+  "source_url": "https://data.zeeker.sg/sources",
+  "about": "Providing free access to Singapore legal resources for data applications, analysis, and AI training",
+  "about_url": "https://data.zeeker.sg/about",
   "databases": {
     "*": {
       "allow_sql": true,
@@ -32,12 +32,16 @@
       "label": "Home"
     },
     {
-      "href": "/-/metadata",
-      "label": "API Info"
+      "href": "/how-to-use",
+      "label": "How to Use"
     },
     {
-      "href": "/templates/pages/about",
+      "href": "/about",
       "label": "About"
+    },
+    {
+      "href": "/status",
+      "label": "Status"
     }
   ]
 }

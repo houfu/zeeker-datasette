@@ -58,7 +58,7 @@ class SampleData:
             "asset_files_default": {
                 "Contents": [
                     {"Key": "assets/default/metadata.json"},
-                    {"Key": "assets/default/templates/index.html"},
+                    {"Key": "assets/default/templates/search.html"},
                     {"Key": "assets/default/templates/database.html"},
                     {"Key": "assets/default/templates/table.html"},
                     {"Key": "assets/default/templates/row.html"},
@@ -111,9 +111,9 @@ class SampleData:
                 "license": "CC-BY-4.0",
                 "license_url": "https://creativecommons.org/licenses/by/4.0/",
                 "source": "Various Singapore legal sources",
-                "source_url": "https://data.zeeker.sg/templates/pages/sources",
+                "source_url": "https://data.zeeker.sg/sources",
                 "about": "Providing free access to Singapore legal resources",
-                "about_url": "https://data.zeeker.sg/templates/pages/about",
+                "about_url": "https://data.zeeker.sg/about",
                 "databases": {
                     "*": {
                         "allow_sql": True,
@@ -231,7 +231,7 @@ class SampleData:
     def sample_template_files():
         """Sample template files for testing"""
         return {
-            "index.html": """<!DOCTYPE html>
+            "search.html": """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">

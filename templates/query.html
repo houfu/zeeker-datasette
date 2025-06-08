@@ -6,21 +6,7 @@
 {% endblock %}
 
 {% block nav %}
-<header>
-  <div class="header-content">
-    <div class="header-left">
-      <div class="logo">data.zeeker.sg</div>
-      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
-    </div>
-    <nav>
-      <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/-/metadata">API Info</a></li>
-        <li><a href="/templates/pages/about">About</a></li>
-      </ul>
-    </nav>
-  </div>
-</header>
+{% include "_header.html" %}
 {% endblock %}
 
 {% block content %}
@@ -36,95 +22,7 @@
     <span>SQL Query</span>
     {% endif %}
   </div>
-  
-  <h1>💻 SQL Query Interface</h1>
-  <p class="query-description">Execute custom SQL queries against Singapore's legal databases. Perfect for advanced analysis, data exploration, and research.</p>
-</div>
-
-<div class="sql-editor">
-  <div class="editor-header">
-    <h2>Query Editor</h2>
-    <div class="editor-controls">
-      {% if database %}
-      <span class="current-database">Database: <strong>{{ database }}</strong></span>
-      {% endif %}
-      <button type="button" class="btn btn-secondary" onclick="clearQuery()">Clear</button>
-      <button type="button" class="btn btn-secondary" onclick="formatQuery()">Format</button>
-    </div>
-  </div>
-  
-  <form method="get" class="query-form">
-    {% if database %}
-    <input type="hidden" name="database" value="{{ database }}">
-    {% endif %}
-    
-    <div class="sql-editor-container">
-      <textarea 
-        name="sql" 
-        class="sql-textarea"
-        placeholder="-- Enter your SQL query here
--- Example: SELECT * FROM table_name LIMIT 10
--- Use CTRL+Enter to execute"
-        aria-label="SQL Query"
-        rows="10">{{ sql_query or '' }}</textarea>
-      
-      <div class="sql-suggestions" id="sql-suggestions"></div>
-    </div>
-    
-    <div class="query-options">
-      <div class="option-group">
-        <label for="row-limit">Row Limit:</label>
-        <select name="_size" id="row-limit">
-          <option value="100"{% if request.args.get('_size') == '100' %} selected{% endif %}>100</option>
-          <option value="500"{% if request.args.get('_size') == '500' %} selected{% endif %}>500</option>
-          <option value="1000"{% if request.args.get('_size') == '1000' %} selected{% endif %}>1000</option>
-          <option value="5000"{% if request.args.get('_size') == '5000' %} selected{% endif %}>5000</option>
-        </select>
-      </div>
-      
-      <div class="option-group">
-        <label for="output-format">Output Format:</label>
-        <select name="_format" id="output-format">
-          <option value="table"{% if request.args.get('_format') == 'table' or not request.args.get('_format') %} selected{% endif %}>Table</option>
-          <option value="json"{% if request.args.get('_format') == 'json' %} selected{% endif %}>JSON</option>
-          <option value="csv"{% if request.args.get('_format') == 'csv' %} selected{% endif %}>CSV</option>
-        </select>
-      </div>
-      
-      <div class="option-group">
-        <label>
-          <input type="checkbox" name="_trace" value="1"{% if request.args.get('_trace') %} checked{% endif %}>
-          Show execution trace
-        </label>
-      </div>
-    </div>
-    
-    <div class="query-actions">
-      <button type="submit" class="btn btn-primary">⚡ Execute Query</button>
-      <button type="button" class="btn btn-secondary" onclick="saveQuery()">💾 Save Query</button>
-      <button type="button" class="btn btn-secondary" onclick="shareQuery()">🔗 Share</button>
-    </div>
-  </form>
-</div>
-
-{% if not database %}
-<div class="database-selector">
-  <div class="card">
-    <h3>📊 Available Databases</h3>
-    <p>Select a database to explore its tables and run queries:</p>
-    <div class="database-list">
-      {% for db in databases %}
-      <a href="/{{ db.name }}?sql=" class="database-option">
-        <div class="db-name">{{ db.name|title }}</div>
-        {% if db.table_count %}
-        <div class="db-meta">{{ db.table_count }} table{{ db.table_count|pluralize }}</div>
-        {% endif %}
-      </a>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-{% endif %}
+  {{ super() }}
 
 <div class="query-examples">
   <div class="card">

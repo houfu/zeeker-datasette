@@ -1,561 +1,123 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>About - Zeeker Legal Data Backbone</title>
-    <meta name="description" content="About Zeeker - Singapore's professional legal data backbone for research, analysis, and AI applications">
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    
-    <!-- Styles -->
-    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
-    
-    <style>
-        .hero-section {
-            text-align: center;
-            padding: 4rem 0;
-            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
-            border-radius: var(--border-radius-large);
-            margin-bottom: 4rem;
-        }
-        
-        .hero-section h1 {
-            font-size: clamp(2.5rem, 5vw, 4rem);
-            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 1rem;
-        }
-        
-        .hero-tagline {
-            font-size: 1.3rem;
-            color: var(--color-text-secondary);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin: 3rem 0;
-        }
-        
-        .feature-card {
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--border-radius-large);
-            padding: 2rem;
-            transition: var(--transition);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-accent-magenta));
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 32px rgba(0, 212, 255, 0.15);
-        }
-        
-        .feature-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            display: block;
-        }
-        
-        .feature-title {
-            color: var(--color-accent-cyan);
-            margin-bottom: 1rem;
-        }
-        
-        .stats-section {
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--border-radius-large);
-            padding: 3rem;
-            margin: 4rem 0;
-            text-align: center;
-        }
-        
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .stat-item {
-            padding: 1.5rem;
-            background: var(--color-bg-tertiary);
-            border-radius: var(--border-radius);
-            border: 1px solid var(--color-border);
-        }
-        
-        .stat-number {
-            font-family: var(--font-heading);
-            font-size: 2.5rem;
-            color: var(--color-accent-cyan);
-            display: block;
-            text-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
-        }
-        
-        .stat-label {
-            color: var(--color-text-secondary);
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
-        }
-        
-        .timeline {
-            margin: 4rem 0;
-        }
-        
-        .timeline-item {
-            display: flex;
-            gap: 2rem;
-            margin-bottom: 3rem;
-            align-items: flex-start;
-        }
-        
-        .timeline-date {
-            font-family: var(--font-heading);
-            color: var(--color-accent-cyan);
-            font-weight: 700;
-            min-width: 120px;
-            text-align: right;
-        }
-        
-        .timeline-content {
-            flex: 1;
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--border-radius-large);
-            padding: 1.5rem;
-            position: relative;
-        }
-        
-        .timeline-content::before {
-            content: '';
-            position: absolute;
-            left: -10px;
-            top: 20px;
-            width: 0;
-            height: 0;
-            border: 10px solid transparent;
-            border-right-color: var(--color-border);
-        }
-        
-        .timeline-content::after {
-            content: '';
-            position: absolute;
-            left: -8px;
-            top: 22px;
-            width: 0;
-            height: 0;
-            border: 8px solid transparent;
-            border-right-color: var(--color-bg-secondary);
-        }
-        
-        .team-section {
-            margin: 4rem 0;
-        }
-        
-        .team-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
-            margin-top: 2rem;
-        }
-        
-        .team-member {
-            text-align: center;
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--border-radius-large);
-            padding: 2rem;
-            transition: var(--transition);
-        }
-        
-        .team-member:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(0, 212, 255, 0.1);
-        }
-        
-        .team-avatar {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
-            margin: 0 auto 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            color: white;
-        }
-        
-        .team-name {
-            font-family: var(--font-heading);
-            color: var(--color-accent-cyan);
-            margin-bottom: 0.5rem;
-        }
-        
-        .team-role {
-            color: var(--color-text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
-        }
-        
-        .cta-section {
-            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
-            border: 1px solid var(--color-border);
-            border-radius: var(--border-radius-large);
-            padding: 4rem;
-            text-align: center;
-            margin: 4rem 0;
-        }
-        
-        .cta-buttons {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-        }
-        
-        @media (max-width: 768px) {
-            .timeline-item {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            
-            .timeline-date {
-                text-align: left;
-                min-width: auto;
-            }
-            
-            .timeline-content::before,
-            .timeline-content::after {
-                display: none;
-            }
-        }
-    </style>
-</head>
+{% extends "default:base.html" %}
 
-<body class="page-about">
-    <header>
-        <div class="header-content">
-            <div class="header-left">
-                <div class="logo">
-                    <a href="/">ZEEKER</a>
-                </div>
-                <div class="tagline">The Legal Data Backbone</div>
-            </div>
-            <nav>
-                <ul>
-                    <li><a href="/">Home</a></li>
-                    <li><a href="/-/metadata">API Info</a></li>
-                    <li><a href="/templates/pages/about" class="active">About</a></li>
-                </ul>
-            </nav>
-        </div>
-    </header>
+{% block extra_head %}
+<meta name="description" content="About Zeeker - Making Singapore legal data searchable and accessible">
+{% endblock %}
 
-    <main>
-        <div class="hero-section">
-            <h1>About Zeeker</h1>
-            <p class="hero-tagline">
-                Singapore's premier legal data backbone, empowering research, analysis, and AI innovation 
-                with comprehensive access to legal resources
-            </p>
+{% block nav %}
+{% include "_header.html" %}
+{% endblock %}
+
+{% block title %}About - Zeeker{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="text-align: center; padding: 2rem 0;">
+        <h1>About Zeeker</h1>
+        <p style="font-size: 1.2rem; color: var(--color-text-secondary);">
+            Making Singapore legal data searchable and accessible to researchers and developers
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>🎯 What This Is</h2>
+        <p>
+            Zeeker is a searchable database of Singapore legal information. Currently focused on
+            legal news, with court decisions being added soon.
+        </p>
+
+        <p>
+            Built for legal researchers, developers, and anyone who needs to search through
+            Singapore legal data efficiently. All data is available through both a web interface
+            and REST API.
+        </p>
+    </div>
+
+    <h2>🛠️ What You Can Do</h2>
+    <div class="features-grid">
+        <div class="feature">
+            <h3>🔍 Full-Text Search</h3>
+            <p>Search across all legal documents with filtering and faceted navigation.</p>
         </div>
 
-        <section class="mission-section">
-            <div class="card">
-                <h2>🎯 Our Mission</h2>
-                <p>
-                    Zeeker transforms how legal professionals, researchers, and technologists access and analyze 
-                    Singapore's legal data. We bridge the gap between traditional legal research and modern 
-                    data science, providing a robust, professional-grade platform for legal intelligence.
-                </p>
-                
-                <p>
-                    Built on the powerful Datasette framework, Zeeker offers immutable, reliable access to 
-                    comprehensive legal datasets including court decisions, parliamentary proceedings, 
-                    regulatory updates, and legal commentary - all through an intuitive, futuristic interface 
-                    designed for the modern legal professional.
-                </p>
-            </div>
-        </section>
+        <div class="feature">
+            <h3>💻 SQL Interface</h3>
+            <p>Write custom SQL queries to analyze the data however you need.</p>
+        </div>
 
-        <section class="features-section">
-            <h2>🚀 Platform Capabilities</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <span class="feature-icon">🏛️</span>
-                    <h3 class="feature-title">Comprehensive Legal Data</h3>
-                    <p>
-                        Access to Supreme Court decisions, High Court judgments, parliamentary debates, 
-                        regulatory documents, and legal news from trusted Singapore sources.
-                    </p>
-                </div>
+        <div class="feature">
+            <h3>📊 Export Data</h3>
+            <p>Download search results or query outputs as JSON, CSV, or SQLite files.</p>
+        </div>
 
-                <div class="feature-card">
-                    <span class="feature-icon">🔒</span>
-                    <h3 class="feature-title">Immutable & Reliable</h3>
-                    <p>
-                        All data served in read-only mode ensuring consistency, integrity, and compliance 
-                        with professional standards for legal research.
-                    </p>
-                </div>
+        <div class="feature">
+            <h3>🔄 REST API</h3>
+            <p>Programmatic access to all data for building tools or conducting research.</p>
+        </div>
+    </div>
 
-                <div class="feature-card">
-                    <span class="feature-icon">🔍</span>
-                    <h3 class="feature-title">Advanced Search</h3>
-                    <p>
-                        Full-text search across all legal documents with sophisticated filtering, 
-                        faceted navigation, and intelligent query suggestions.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">🛠️</span>
-                    <h3 class="feature-title">Developer-Friendly API</h3>
-                    <p>
-                        RESTful APIs with JSON and CSV exports, SQL query interface, and comprehensive 
-                        documentation for seamless integration.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">🤖</span>
-                    <h3 class="feature-title">AI-Ready Data</h3>
-                    <p>
-                        Structured, clean datasets perfect for machine learning, natural language processing, 
-                        and legal AI applications.
-                    </p>
-                </div>
-
-                <div class="feature-card">
-                    <span class="feature-icon">⚡</span>
-                    <h3 class="feature-title">Real-Time Updates</h3>
-                    <p>
-                        Automatic synchronization with source systems ensures you always have access 
-                        to the latest legal information and decisions.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <section class="stats-section">
-            <h2>📊 Platform Statistics</h2>
-            <p>Powering legal research and innovation across Singapore</p>
-            
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-number">10K+</span>
-                    <div class="stat-label">Court Decisions</div>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">50K+</span>
-                    <div class="stat-label">Legal Documents</div>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">24/7</span>
-                    <div class="stat-label">API Availability</div>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number">99.9%</span>
-                    <div class="stat-label">Uptime SLA</div>
-                </div>
-            </div>
-        </section>
-
-        <section class="technology-section">
-            <div class="card">
-                <h2>🔧 Technology Stack</h2>
-                <p>
-                    Zeeker is built on cutting-edge, open-source technologies designed for reliability, 
-                    performance, and scalability:
-                </p>
-                
-                <div class="tech-grid">
-                    <div class="tech-item">
-                        <h4>🗄️ Datasette Core</h4>
-                        <p>
-                            Built on Simon Willison's Datasette - the premier platform for exploring 
-                            and publishing data with built-in API generation and SQL query interface.
-                        </p>
-                    </div>
-                    
-                    <div class="tech-item">
-                        <h4>📱 Responsive Design</h4>
-                        <p>
-                            Mobile-first, accessible interface that works seamlessly across devices 
-                            while maintaining professional aesthetics.
-                        </p>
-                    </div>
-                    
-                    <div class="tech-item">
-                        <h4>☁️ Cloud Infrastructure</h4>
-                        <p>
-                            Containerized deployment with automatic database synchronization from 
-                            secure cloud storage for reliability and scalability.
-                        </p>
-                    </div>
-                    
-                    <div class="tech-item">
-                        <h4>🔐 Security First</h4>
-                        <p>
-                            Read-only data access, secure API endpoints, and compliance with 
-                            professional data handling standards.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="timeline">
-            <h2>📅 Development Timeline</h2>
-            
-            <div class="timeline-item">
-                <div class="timeline-date">2025 Q1</div>
-                <div class="timeline-content">
-                    <h3>Platform Launch</h3>
-                    <p>
-                        Initial release of Zeeker with core legal databases, futuristic UI design, 
-                        and comprehensive API access for Singapore legal data.
-                    </p>
-                </div>
-            </div>
-            
-            <div class="timeline-item">
-                <div class="timeline-date">2024 Q4</div>
-                <div class="timeline-content">
-                    <h3>Beta Testing</h3>
-                    <p>
-                        Extensive testing with legal professionals, researchers, and developers 
-                        to refine the user experience and API functionality.
-                    </p>
-                </div>
-            </div>
-            
-            <div class="timeline-item">
-                <div class="timeline-date">2024 Q3</div>
-                <div class="timeline-content">
-                    <h3>Data Pipeline Development</h3>
-                    <p>
-                        Built automated systems for collecting, processing, and synchronizing 
-                        legal data from multiple Singapore government and judicial sources.
-                    </p>
-                </div>
-            </div>
-            
-            <div class="timeline-item">
-                <div class="timeline-date">2024 Q2</div>
-                <div class="timeline-content">
-                    <h3>Project Inception</h3>
-                    <p>
-                        Identified the need for a comprehensive, professional-grade platform 
-                        for accessing Singapore legal data for research and AI applications.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <section class="use-cases-section">
-            <div class="card">
-                <h2>💼 Use Cases</h2>
-                <p>Zeeker serves diverse stakeholders in Singapore's legal ecosystem:</p>
-                
-                <div class="use-case-grid">
-                    <div class="use-case">
-                        <h3>👨‍💼 Legal Professionals</h3>
-                        <ul>
-                            <li>Research case precedents and legal trends</li>
-                            <li>Track regulatory changes and updates</li>
-                            <li>Analyze judicial decision patterns</li>
-                            <li>Prepare legal briefs with comprehensive data</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="use-case">
-                        <h3>🔬 Academic Researchers</h3>
-                        <ul>
-                            <li>Conduct empirical legal studies</li>
-                            <li>Analyze legislative trends over time</li>
-                            <li>Study judicial behavior and decision-making</li>
-                            <li>Publish data-driven legal scholarship</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="use-case">
-                        <h3>💻 Technology Developers</h3>
-                        <ul>
-                            <li>Build legal tech applications and tools</li>
-                            <li>Train AI models on legal text data</li>
-                            <li>Develop legal analytics platforms</li>
-                            <li>Create compliance monitoring systems</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="use-case">
-                        <h3>🏢 Enterprise Users</h3>
-                        <ul>
-                            <li>Integrate legal data into business intelligence</li>
-                            <li>Monitor regulatory compliance requirements</li>
-                            <li>Automate legal risk assessment</li>
-                            <li>Support strategic decision-making</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="cta-section">
-            <h2>🚀 Get Started Today</h2>
+    <section class="technology-section">
+        <div class="card">
+            <h2>🔧 How It Works</h2>
             <p>
-                Join Singapore's leading legal professionals, researchers, and developers who rely on 
-                Zeeker for comprehensive legal data access. Whether you're conducting research, 
-                building applications, or analyzing trends, Zeeker provides the tools you need.
+                Built on Datasette, an open-source tool for exploring and publishing data.
+                Data is stored in SQLite databases and automatically updated from various sources.
             </p>
-            
-            <div class="cta-buttons">
-                <a href="/" class="btn btn-primary">🏠 Explore Databases</a>
-                <a href="/-/metadata" class="btn btn-secondary">📊 View API Documentation</a>
-                <a href="/templates/pages/sources" class="btn btn-secondary">📋 Data Sources</a>
-            </div>
-        </section>
-    </main>
+        </div>
+    </section>
 
-    <footer>
-        <div class="footer-content">
-            <div class="footer-links">
-                <a href="/">Home</a>
-                <a href="/-/metadata">API Documentation</a>
-                <a href="/templates/pages/about">About</a>
-                <a href="/templates/pages/sources">Data Sources</a>
-                <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">License (CC-BY-4.0)</a>
-            </div>
-            <div class="footer-text">
-                <p>&copy; 2025 Zeeker - Singapore Legal Data Backbone</p>
-                <p>Empowering legal innovation through professional data access</p>
+    <section class="use-cases-section">
+        <div class="card">
+            <h2>💼 Who Uses This</h2>
+
+            <div class="use-case-grid">
+                <div class="use-case">
+                    <h3>👨‍💼 Legal Researchers</h3>
+                    <ul>
+                        <li>Track legal developments and trends</li>
+                        <li>Search for case references and precedents</li>
+                        <li>Analyze judicial patterns over time</li>
+                        <li>Export data for further analysis</li>
+                    </ul>
+                </div>
+
+                <div class="use-case">
+                    <h3>💻 Developers</h3>
+                    <ul>
+                        <li>Build legal technology applications</li>
+                        <li>Create monitoring and alert systems</li>
+                        <li>Integrate legal data into other tools</li>
+                        <li>Develop research and analysis workflows</li>
+                    </ul>
+                </div>
             </div>
         </div>
-    </footer>
+    </section>
 
-    <!-- JavaScript -->
-    <script src="/static/js/zeeker-enhanced.js"></script>
-</body>
-</html>
+    <section class="current-status">
+        <div class="card">
+            <h2>📅 Current Status</h2>
+            <p>
+                <strong>Legal News Database:</strong> Active and regularly updated<br>
+                <strong>Court Decisions:</strong> Coming soon<br>
+                <strong>Parliamentary Data:</strong> Planned for future release
+            </p>
+        </div>
+    </section>
+
+    <section class="cta-section">
+        <h2>🚀 Get Started</h2>
+        <p>Ready to explore Singapore legal data? Start with a search or dive into the SQL interface.</p>
+
+        <div class="cta-buttons">
+            <a href="/" class="btn btn-primary">🏠 Explore Data</a>
+            <a href="/-/metadata" class="btn btn-secondary">📊 API Documentation</a>
+            <a href="/sources" class="btn btn-secondary">📋 Data Sources</a>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block footer %}
+{% include "_footer.html" %}
+{% endblock %}

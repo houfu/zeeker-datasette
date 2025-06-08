@@ -13,13 +13,13 @@ services:
       - AWS_REGION=${AWS_REGION:-default}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    volumes:
-      - ./templates:/app/templates
-      - ./static:/app/static
-      - ./plugins:/app/plugins
-      - ./metadata.json:/app/metadata.json
-      # Mount local data directory for refresh functionality
-      - ./data:/data
+#    volumes:
+#      - ./templates:/app/templates
+#      - ./static:/app/static
+#      - ./plugins:/app/plugins
+#      - ./metadata.json:/app/metadata.json
+#      # Mount local data directory for refresh functionality
+#      - ./data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/"]

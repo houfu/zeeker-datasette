@@ -543,6 +543,7 @@ dependencies = [
     { name = "datasette" },
     { name = "datasette-search-all" },
     { name = "python-dotenv" },
+    { name = "pyyaml" },
 ]
 
 [package.dev-dependencies]
@@ -558,6 +559,7 @@ requires-dist = [
     { name = "datasette", specifier = "==0.65.1" },
     { name = "datasette-search-all", specifier = ">=1.1.4" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
 ]
 
 [package.metadata.requires-dev]

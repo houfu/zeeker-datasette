@@ -45,7 +45,7 @@ def temp_project_structure():
                 "extra_js_urls": ["/static/js/zeeker-enhanced.js"],
             },
             ".env": "S3_BUCKET=test-bucket\nAWS_REGION=us-east-1\n",
-            "templates/index.html": "<html><body>Test Index</body></html>",
+            "templates/search.html": "<html><body>Test Index</body></html>",
             "templates/database.html": "<html><body>Test Database</body></html>",
             "static/css/zeeker-theme.css": "body { background: #1a1a1a; }",
             "static/js/zeeker-enhanced.js": "console.log('Enhanced JS loaded');",
@@ -238,7 +238,7 @@ def s3_responses():
         "asset_files": {
             "Contents": [
                 {"Key": "assets/default/metadata.json"},
-                {"Key": "assets/default/templates/index.html"},
+                {"Key": "assets/default/templates/search.html"},
                 {"Key": "assets/default/static/css/style.css"},
             ]
         },

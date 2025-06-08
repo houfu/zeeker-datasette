@@ -1,0 +1,88 @@
+# Simplified strings - more direct, less corporate
+db_available_resources: Available Data
+db_columns: columns
+db_explore: Explore
+db_export_csv: CSV
+db_export_json: JSON
+db_schema: Schema
+db_searchable: searchable
+db_tables: tables
+db_total_rows: total rows
+error_database_not_found: Database not found
+error_invalid_sql: Invalid SQL query
+error_no_permission: Permission denied
+error_query_failed: Query failed
+error_table_not_found: Table not found
+form_export: Export format
+form_filter: Filter
+form_limit: Limit results
+form_search: Search
+form_sort: Sort by
+nav_about: About
+nav_api: API
+nav_home: Home
+nav_sources: Sources
+plural_database: database
+plural_databases: databases
+plural_result: result
+plural_results: results
+plural_row: row
+plural_rows: rows
+plural_table: table
+plural_tables: tables
+search_no_results: No results found
+search_placeholder: Search legal news, cases, decisions...
+search_results_for: Results for "{query}"
+search_start: 🔍 Start Searching
+site_description: Explore Singapore legal data through search and SQL queries
+site_tagline: Singapore Legal Data
+site_title: data.zeeker.sg
+status_empty_table: This table is empty
+status_no_data: No data available
+status_processing: Processing...
+success_copied_clipboard: Copied!
+success_data_exported: Data exported
+success_query_completed: Query completed
+time_last_month: Last month
+time_last_week: Last week
+time_last_year: Last year
+time_today: Today
+time_yesterday: Yesterday
+ui_back: Back
+ui_copied: Copied!
+ui_copy: Copy
+ui_error: Error
+ui_immutable_data: Read-only data
+ui_loading: Loading...
+ui_next: Next
+ui_previous: Previous
+home_platform_features_list:
+  - 🔍 Full-text search across all legal documents
+  - 💻 SQL query interface for custom analysis
+  - 📊 Export data as JSON, CSV, or SQLite files
+  - ⚡ Regularly updated with new data
+  - 🔄 REST API for programmatic access
+  - 📱 Works on desktop and mobile devices
+
+# Add these to your existing plugins/strings.yaml:
+
+nav_status: Status
+changelog_title: Project Status
+changelog_subtitle: Current system stats and recent updates
+
+# Basic labels
+stats_databases: databases
+stats_tables: tables
+stats_rows: rows
+recent_updates_title: Recent Updates
+
+# Recent updates timeline
+recent_updates:
+  - date: "2025-06-09"
+    type: "feature"
+    title: "data.zeeker.sg launches!"
+    description: "Everything is new and shiny here!"
+  - date: "2025-05-16"
+    type: "data"
+    title: "Sglawwatch -- headlines starts"
+    description: "Legal News in Singapore selected by Editors starts compiling and automatic updates"
