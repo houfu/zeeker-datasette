@@ -2,309 +2,473 @@
 
 {% block extra_head %}
 {{ super() }}
-<meta name="description" content="Explore {{ database }} legal database - {{ database_description or 'Singapore legal data for research and analysis' }}">
+<meta name="description" content="Explore {{ database }} database - Singapore legal data">
 {% endblock %}
 
 {% block nav %}
-<header>
-  <div class="header-content">
-    <div class="header-left">
-      <div class="logo">data.zeeker.sg</div>
-      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
-    </div>
-    <nav>
-      <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/-/metadata">API Info</a></li>
-        <li><a href="/templates/pages/about">About</a></li>
-      </ul>
-    </nav>
-  </div>
-</header>
+{% include "_header.html" %}
 {% endblock %}
 
 {% block content %}
 <div class="database-header">
-  <!-- Breadcrumbs stay outside the card -->
-  <div class="breadcrumbs">
-    <a href="/">🏠 Home</a>
-    <span class="separator">→</span>
-    <span>{{ database|title }}</span>
-  </div>
-
-  <!-- IMPROVED: Wrap everything in a proper overview card -->
-  <div class="database-overview">
-    <div class="database-info">
-
-      <!-- Left side: Title, description, stats -->
-      <div class="database-summary">
-        <h1 class="database-title">{{ database|title }} Database</h1>
-
-        {% if database_description %}
-        <p class="database-subtitle">{{ database_description }}</p>
-        {% else %}
-        <p class="database-subtitle">
-          Professional access to Singapore's legal data for research, analysis, and AI applications
-        </p>
-        {% endif %}
-
-        <!-- Database Statistics -->
-        <div class="database-stats">
-          {% if tables %}
-          <div class="stat-item">
-            <span class="stat-number">{{ tables|length }}</span>
-            <span class="stat-label">table{{ tables|length|pluralize }}</span>
-          </div>
-          {% endif %}
-
-          {% if tables %}
-          {% set total_rows = tables|sum(attribute='count')|default(0) %}
-          {% if total_rows > 0 %}
-          <div class="stat-item">
-            <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
-            <span class="stat-label">total rows</span>
-          </div>
-          {% endif %}
-          {% endif %}
-
-          {% if database_size is defined and database_size %}
-          <div class="stat-item">
-            <span class="stat-number">{{ database_size|filesizeformat }}</span>
-            <span class="stat-label">database size</span>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Right side: Search and actions -->
-      <div class="database-actions-section">
-        <!-- Export Actions -->
-        <div class="export-actions">
-          <a href="/{{ database }}.json" class="btn btn-secondary">📊 JSON</a>
-          <a href="/{{ database }}.csv" class="btn btn-secondary">📈 CSV</a>
-          <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn btn-secondary">🔍 Schema</a>
-        </div>
-
-      </div>
+    <!-- Breadcrumbs stay outside the card -->
+    <div class="breadcrumbs">
+        <a href="/">🏠 Home</a>
+        <span class="separator">→</span>
+        <span>{{ database|title }}</span>
     </div>
-  </div>
+
+    <!-- Database overview card -->
+    <div class="database-overview">
+        <div class="database-info">
+
+            <!-- Left side: Title, description, stats -->
+            <div class="database-summary">
+                <h1 class="database-title">{{ database|title }}</h1>
+
+                {% if database_description %}
+                <p class="database-subtitle">{{ database_description }}</p>
+                {% else %}
+                <p class="database-subtitle">
+                    Searchable Singapore legal data
+                </p>
+                {% endif %}
+
+                <!-- Database Statistics -->
+                <div class="database-stats">
+                    {% if tables %}
+                    <div class="stat-item">
+                        <span class="stat-number">{{ tables|length }}</span>
+                        <span class="stat-label">table{% if tables|length != 1 %}s{% endif %}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if tables %}
+                    {% set total_rows = 0 %}
+                    {% for table in tables %}
+                    {% if table.count %}
+                    {% set total_rows = total_rows + table.count %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if total_rows > 0 %}
+                    <div class="stat-item">
+                        <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
+                        <span class="stat-label">total rows</span>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if database_size is defined and database_size %}
+                    <div class="stat-item">
+                        <span class="stat-number">{{ database_size|filesizeformat }}</span>
+                        <span class="stat-label">size</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right side: Actions -->
+            <div class="database-actions-section">
+                <div class="export-actions">
+                    <a href="/{{ database }}.json" class="btn btn-secondary">📊 JSON</a>
+                    <a href="/{{ database }}.csv" class="btn btn-secondary">📈 CSV</a>
+                    <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27"
+                       class="btn btn-secondary">🔍 Schema</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% if search_query %}
 <div class="card">
-  <div class="card-header">
-    <h2 class="card-title">Search Results for "{{ search_query }}"</h2>
-    <p class="card-description">
-      {% if search_results %}
-      Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}
-      {% else %}
-      No tables found matching your search.
-      {% endif %}
-    </p>
-  </div>
+    <div class="card-header">
+        <h2 class="card-title">Search Results for "{{ search_query }}"</h2>
+        <p class="card-description">
+            {% if search_results %}
+            Found {{ search_results|length }} matching table{% if search_results|length != 1 %}s{% endif %}
+            {% else %}
+            No tables found matching your search.
+            {% endif %}
+        </p>
+    </div>
 </div>
 {% endif %}
 
 {% if tables %}
 <section class="tables-section">
-  {% if not search_query %}
-  <h2>Available Tables</h2>
-  {% endif %}
+    {% if not search_query %}
+    <h2>Tables</h2>
+    {% endif %}
 
-  <div class="tables-grid">
-    {% for table in tables %}
-    <div class="card table-card">
-      <div class="table-header">
-        <h3>
-          <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
-        </h3>
+    <div class="tables-grid">
+        {% for table in tables %}
+        <div class="card table-card">
+            <div class="table-header">
+                <h3>
+                    <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
+                </h3>
 
-        <div class="table-badges">
-          {% if table.count is defined and table.count is not none %}
-          <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
-          {% endif %}
-          
-          {% if table.columns %}
-          <span class="badge badge-columns">{{ table.columns|length }} columns</span>
-          {% endif %}
-          
-          {% if table.fts %}
-          <span class="badge badge-fts">🔍 Searchable</span>
-          {% endif %}
-          
-          {% if table.has_primary_key %}
-          <span class="badge badge-pk">🔑 Primary Key</span>
-          {% endif %}
-        </div>
-      </div>
-      
-      {% if table.description %}
-      <p class="table-description">{{ table.description }}</p>
-      {% endif %}
-      
-      {% if table.columns %}
-      <div class="table-schema">
-        <h4>Key Columns:</h4>
-        <div class="column-list">
-          {% for column in table.columns[:5] %}
-          <div class="column-item">
-            <span class="column-name">{{ column.name }}</span>
-            <span class="column-type">{{ column.type }}</span>
-            {% if column.is_pk %}
-            <span class="column-flag">PK</span>
+                <div class="table-badges">
+                    {% if table.count is defined and table.count is not none %}
+                    <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
+                    {% endif %}
+
+                    {% if table.columns %}
+                    <span class="badge badge-columns">{{ table.columns|length }} columns</span>
+                    {% endif %}
+
+                    {% if table.fts %}
+                    <span class="badge badge-fts">🔍 Searchable</span>
+                    {% endif %}
+
+                    {% if table.has_primary_key %}
+                    <span class="badge badge-pk">🔑 Primary Key</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if table.description %}
+            <p class="table-description">{{ table.description }}</p>
             {% endif %}
-            {% if column.notnull %}
-            <span class="column-flag">NOT NULL</span>
+
+            {% if table.columns %}
+            <div class="table-schema">
+                <h4>Key Columns:</h4>
+                <div class="column-list">
+                    {% for column in table.columns[:5] %}
+                    <div class="column-item">
+                        <span class="column-name">{{ column.name }}</span>
+                        <span class="column-type">{{ column.type }}</span>
+                        {% if column.is_pk %}
+                        <span class="column-flag">PK</span>
+                        {% endif %}
+                        {% if column.notnull %}
+                        <span class="column-flag">NOT NULL</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if table.columns|length > 5 %}
+                    <div class="column-item more-columns">
+                        <em>...and {{ table.columns|length - 5 }} more column{% if (table.columns|length - 5) != 1 %}s{%
+                            endif %}</em>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
             {% endif %}
-          </div>
-          {% endfor %}
-          {% if table.columns|length > 5 %}
-          <div class="column-item more-columns">
-            <em>...and {{ table.columns|length - 5 }} more column{{ (table.columns|length - 5)|pluralize }}</em>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
-      
-      {% if table.sample_rows %}
-      <div class="table-preview">
-        <h4>Sample Data:</h4>
-        <div class="preview-table">
-          <table>
-            <thead>
-              <tr>
-                {% for column in table.columns[:3] %}
-                <th>{{ column.name }}</th>
-                {% endfor %}
-                {% if table.columns|length > 3 %}
-                <th>...</th>
+
+            {% if table.sample_rows %}
+            <div class="table-preview">
+                <h4>Sample Data:</h4>
+                <div class="preview-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            {% for column in table.columns[:3] %}
+                            <th>{{ column.name }}</th>
+                            {% endfor %}
+                            {% if table.columns|length > 3 %}
+                            <th>...</th>
+                            {% endif %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in table.sample_rows[:2] %}
+                        <tr>
+                            {% for cell in row[:3] %}
+                            <td>{{ cell|truncate(30) }}</td>
+                            {% endfor %}
+                            {% if table.columns|length > 3 %}
+                            <td>...</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="table-actions">
+                <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore</a>
+                <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
+                <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
+                {% if table.fts %}
+                <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
                 {% endif %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in table.sample_rows[:2] %}
-              <tr>
-                {% for cell in row[:3] %}
-                <td>{{ cell|truncate(30) }}</td>
-                {% endfor %}
-                {% if table.columns|length > 3 %}
-                <td>...</td>
-                {% endif %}
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+            </div>
         </div>
-      </div>
-      {% endif %}
-      
-      <div class="table-actions">
-        <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore Table</a>
-        <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
-        <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
-        {% if table.fts %}
-        <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
-        {% endif %}
-      </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-  </div>
 </section>
 {% else %}
 <section class="no-tables">
-  <div class="card">
-    <h2>No Tables Available</h2>
-    {% if search_query %}
-    <p>No tables found matching "{{ search_query }}". Try a different search term or <a href="/{{ database }}">view all tables</a>.</p>
-    {% else %}
-    <p>This database doesn't contain any tables yet. Check back later as data is synchronized from the cloud.</p>
-    {% endif %}
-  </div>
+    <div class="card">
+        <h2>No Tables Available</h2>
+        {% if search_query %}
+        <p>No tables found matching "{{ search_query }}". Try a different search term or <a href="/{{ database }}">view
+            all tables</a>.</p>
+        {% else %}
+        <p>This database doesn't contain any tables yet. Data is synchronized regularly.</p>
+        {% endif %}
+    </div>
 </section>
 {% endif %}
 
 {% if views %}
 <section class="views-section">
-  <h2>Available Views</h2>
-  <div class="views-grid">
-    {% for view in views %}
-    <div class="card view-card">
-      <h3>
-        <a href="/{{ database }}/{{ view.name }}">{{ view.name|title }}</a>
-      </h3>
-      
-      {% if view.description %}
-      <p class="view-description">{{ view.description }}</p>
-      {% endif %}
-      
-      <div class="view-actions">
-        <a href="/{{ database }}/{{ view.name }}" class="btn btn-primary">Query View</a>
-        <a href="/{{ database }}/{{ view.name }}.json" class="btn">JSON</a>
-      </div>
+    <h2>Views</h2>
+    <div class="views-grid">
+        {% for view in views %}
+        <div class="card view-card">
+            <h3>
+                <a href="/{{ database }}/{{ view.name }}">{{ view.name|title }}</a>
+            </h3>
+
+            {% if view.description %}
+            <p class="view-description">{{ view.description }}</p>
+            {% endif %}
+
+            <div class="view-actions">
+                <a href="/{{ database }}/{{ view.name }}" class="btn btn-primary">Query</a>
+                <a href="/{{ database }}/{{ view.name }}.json" class="btn">JSON</a>
+            </div>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-  </div>
 </section>
 {% endif %}
 
-<section class="database-tools">
-  <div class="card">
-    <h2>🛠️ Database Tools</h2>
-    
-    <div class="tools-grid">
-      <div class="tool">
-        <h3>💻 SQL Query</h3>
-        <p>Run custom SQL queries against this database</p>
-        <a href="/{{ database }}?sql=" class="btn">Open SQL Editor</a>
-      </div>
-      
-      <div class="tool">
-        <h3>📊 Schema Explorer</h3>
-        <p>Explore database structure and relationships</p>
-        <a href="/{{ database }}?sql=SELECT+name,+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name" class="btn">View Schema</a>
-      </div>
-      
-      <div class="tool">
-        <h3>📈 Data Export</h3>
-        <p>Export entire database in various formats</p>
-        <div class="export-options">
-          <a href="/{{ database }}.json" class="btn">Complete JSON</a>
-          <a href="/{{ database }}.csv" class="btn">Complete CSV</a>
-          <a href="/{{ database }}.db" class="btn">SQLite File</a>
+<!-- Enhanced SQL Examples Section -->
+<section class="sql-examples-section">
+    <div class="card">
+        <h2>💻 SQL Examples for {{ database|title }}</h2>
+        <p>Get started with these ready-to-use queries for exploring {{ database }} data:</p>
+
+        <div class="examples-grid">
+            {% if tables %}
+            <!-- Basic exploration examples -->
+            <div class="example-card">
+                <h4>📊 Overview of All Tables</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- See all tables and their structure
+SELECT name, sql
+FROM sqlite_master
+WHERE type = 'table'
+ORDER BY name;</code></pre>
+                </div>
+                <p><em>Explore the complete database schema</em></p>
+                <a href="/{{ database }}?sql=SELECT+name%2C+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+
+            {% set first_table = tables[0] %}
+            <div class="example-card">
+                <h4>🔍 Sample Data from {{ first_table.name|title }}</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Get a sample of {{ first_table.name }} data
+SELECT *
+FROM "{{ first_table.name }}"
+LIMIT 10;</code></pre>
+                </div>
+                <p><em>Quick preview of {{ first_table.name }} table contents</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22+LIMIT+10" class="try-button">🔗
+                    Try This Query</a>
+            </div>
+
+            {% if first_table.count and first_table.count > 0 %}
+            <div class="example-card">
+                <h4>📈 Record Counts by Table</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Count records in each table
+{% for table in tables[:3] %}SELECT '{{ table.name }}' as table_name, COUNT(*) as record_count FROM "{{ table.name }}"{% if not loop.last %}
+UNION ALL
+{% endif %}{% endfor %}{% if tables|length > 3 %}
+-- Add more tables as needed{% endif %}
+ORDER BY record_count DESC;</code></pre>
+                </div>
+                <p><em>Compare data volume across tables</em></p>
+                {% set union_query = [] %}
+                {% for table in tables[:3] %}
+                {% set query_part = "SELECT+%27" + table.name +
+                "%27+as+table_name%2C+COUNT%28*%29+as+record_count+FROM+%22" + table.name + "%22" %}
+                {% if union_query.append(query_part) %}{% endif %}
+                {% endfor %}
+                <a href="/{{ database }}?sql={{ union_query|join('+UNION+ALL+') }}+ORDER+BY+record_count+DESC"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+            {% endif %}
+
+            <!-- Legal-specific examples if this looks like legal data -->
+            {% if database|lower in ['sglawwatch', 'legal', 'court', 'law'] %}
+            {% set date_column = '' %}
+            {% set text_column = '' %}
+            {% for column in first_table.columns %}
+            {% if not date_column and column.name|lower in ['date', 'created_at', 'updated_at', 'published'] %}
+            {% set date_column = column.name %}
+            {% endif %}
+            {% if not text_column and column.type|lower in ['text', 'varchar'] %}
+            {% set text_column = column.name %}
+            {% endif %}
+            {% endfor %}
+
+            <div class="example-card">
+                <h4>📅 Recent Legal Updates</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Find recent legal developments
+SELECT {% if first_table.columns %}{{ first_table.columns[0].name }}{% if first_table.columns|length > 1 %}, {{ first_table.columns[1].name }}{% endif %}{% else %}*{% endif %}
+FROM "{{ first_table.name }}"
+{% if date_column %}WHERE {{ date_column }} >= date('now', '-30 days')
+ORDER BY {{ date_column }} DESC{% else %}ORDER BY 1{% endif %}
+LIMIT 20;</code></pre>
+                </div>
+                <p><em>See what's new in the last 30 days</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22{% if date_column %}+ORDER+BY+{{ date_column }}{% endif %}+DESC+LIMIT+20"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="example-card">
+                <h4>🔍 Text Search Example</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Search for contract-related content
+SELECT {% for column in first_table.columns[:2] %}{{ column.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+FROM "{{ first_table.name }}"
+{% if text_column %}WHERE LOWER({{ text_column }}) LIKE '%contract%'{% endif %}
+{% if date_column %}ORDER BY {{ date_column }} DESC{% else %}ORDER BY 1{% endif %}
+LIMIT 15;</code></pre>
+                </div>
+                <p><em>Find content containing specific legal terms</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22{% if text_column %}+WHERE+LOWER%28{{ text_column }}%29+LIKE+%27%25contract%25%27{% endif %}+LIMIT+15"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+            {% endif %}
+
+            <!-- Generic useful examples -->
+            {% set sort_column = '' %}
+            {% set filter_column = '' %}
+            {% for column in first_table.columns %}
+            {% if not sort_column and column.name|lower in ['date', 'created_at', 'updated_at', 'id'] %}
+            {% set sort_column = column.name %}
+            {% endif %}
+            {% if not filter_column and column.type|lower in ['text', 'varchar'] %}
+            {% set filter_column = column.name %}
+            {% endif %}
+            {% endfor %}
+
+            <div class="example-card">
+                <h4>🎯 Custom Filter Example</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Filter and sort your way
+SELECT *
+FROM "{{ first_table.name }}"
+{% if filter_column %}WHERE {{ filter_column }} IS NOT NULL{% endif %}
+{% if sort_column %}ORDER BY {{ sort_column }} DESC{% else %}ORDER BY 1{% endif %}
+LIMIT 25;</code></pre>
+                </div>
+                <p><em>Template for building your own filters</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22{% if sort_column %}+ORDER+BY+{{ sort_column }}{% endif %}+DESC+LIMIT+25"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+
+            {% endif %}
+
+            <!-- Universal examples -->
+            <div class="example-card">
+                <h4>🔧 Build Your Own Query</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Start with this template
+SELECT
+    -- Choose your columns
+    *
+FROM
+    "{% if tables %}{{ first_table.name }}{% else %}table_name{% endif %}"
+WHERE
+    -- Add your conditions
+    1=1
+ORDER BY
+    -- Sort your results
+    {% if sort_column %}{{ sort_column }}{% else %}1{% endif %} DESC
+LIMIT 50;</code></pre>
+                </div>
+                <p><em>Customize this template for your specific needs</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{% if tables %}{{ first_table.name }}{% else %}table_name{% endif %}%22+LIMIT+50"
+                   class="try-button">🔗 Try SQL Editor</a>
+            </div>
         </div>
-      </div>
-      
-      <div class="tool">
-        <h3>🔍 Advanced Search</h3>
-        <p>Search across all tables in this database</p>
-        <a href="/-/search?database={{ database }}" class="btn">Search Database</a>
-      </div>
+
+        <div class="tip-box">
+            <h4>💡 SQL Tips for {{ database|title }}</h4>
+            <ul>
+                <li><strong>Table names with spaces:</strong> Use double quotes like <code>"table name"</code></li>
+                <li><strong>Text search:</strong> Use <code>LIKE '%keyword%'</code> for partial matches</li>
+                <li><strong>Date filtering:</strong> Use <code>date >= '2024-01-01'</code> format</li>
+                <li><strong>Sorting:</strong> Add <code>ORDER BY column_name DESC</code> for newest first</li>
+                <li><strong>Limit results:</strong> Always add <code>LIMIT 100</code> to avoid huge results</li>
+            </ul>
+        </div>
     </div>
-  </div>
+</section>
+
+<section class="database-tools">
+    <div class="card">
+        <h2>🛠️ Database Tools</h2>
+
+        <div class="tools-grid">
+            <div class="tool">
+                <h3>💻 SQL Query</h3>
+                <p>Write custom SQL queries against this database</p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+LIMIT+25" class="btn">SQL Editor</a>
+            </div>
+
+            <div class="tool">
+                <h3>📊 Schema</h3>
+                <p>Explore database structure and relationships</p>
+                <a href="/{{ database }}?sql=SELECT+name,+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name"
+                   class="btn">View Schema</a>
+            </div>
+
+            <div class="tool">
+                <h3>📈 Export All</h3>
+                <p>Download the entire database</p>
+                <div class="export-options">
+                    <a href="/{{ database }}.json" class="btn">JSON</a>
+                    <a href="/{{ database }}.csv" class="btn">CSV</a>
+                    <a href="/{{ database }}.db" class="btn">SQLite</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </section>
 
 {% if canned_queries %}
 <section class="canned-queries">
-  <div class="card">
-    <h2>📋 Saved Queries</h2>
-    <p>Pre-built queries for common legal research tasks</p>
-    
-    <div class="queries-grid">
-      {% for query in canned_queries %}
-      <div class="query-card">
-        <h3>{{ query.title }}</h3>
-        {% if query.description %}
-        <p class="query-description">{{ query.description }}</p>
-        {% endif %}
-        <div class="query-actions">
-          <a href="/{{ database }}?{{ query.name }}" class="btn btn-primary">Run Query</a>
-          <a href="/{{ database }}?{{ query.name }}&_format=json" class="btn">JSON</a>
+    <div class="card">
+        <h2>📋 Example Queries</h2>
+        <p>Common queries to get you started</p>
+
+        <div class="queries-grid">
+            {% for query in canned_queries %}
+            <div class="query-card">
+                <h3>{{ query.title }}</h3>
+                {% if query.description %}
+                <p class="query-description">{{ query.description }}</p>
+                {% endif %}
+                <div class="query-actions">
+                    <a href="/{{ database }}?{{ query.name }}" class="btn btn-primary">Run</a>
+                    <a href="/{{ database }}?{{ query.name }}&_format=json" class="btn">JSON</a>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-      </div>
-      {% endfor %}
     </div>
-  </div>
 </section>
 {% endif %}
 {% endblock %}

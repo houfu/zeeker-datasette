@@ -203,7 +203,7 @@ class TestZeekerS3Downloader:
         mock_s3_client.get_paginator.return_value.paginate.return_value = [
             {
                 "Contents": [
-                    {"Key": "assets/default/templates/index.html"},
+                    {"Key": "assets/default/templates/search.html"},
                     {"Key": "assets/default/templates/base.html"},
                     {"Key": "assets/default/static/css/style.css"},
                 ]
@@ -221,7 +221,7 @@ class TestZeekerS3Downloader:
         # Verify the correct files were downloaded
         calls = mock_s3_client.download_file.call_args_list
         downloaded_files = [call[0][1] for call in calls]
-        assert "assets/default/templates/index.html" in downloaded_files
+        assert "assets/default/templates/search.html" in downloaded_files
         assert "assets/default/templates/base.html" in downloaded_files
 
     @patch("scripts.download_from_s3.boto3.client")
@@ -229,7 +229,7 @@ class TestZeekerS3Downloader:
         """Test uploading a local directory to S3"""
         # Create some test files
         templates_dir = temp_directories["templates_dir"]
-        (templates_dir / "index.html").write_text("<html>Test</html>")
+        (templates_dir / "search.html").write_text("<html>Test</html>")
         (templates_dir / "subdir").mkdir()
         (templates_dir / "subdir" / "page.html").write_text("<html>Page</html>")
 
@@ -245,7 +245,7 @@ class TestZeekerS3Downloader:
         # Verify correct S3 keys
         calls = mock_s3_client.upload_file.call_args_list
         s3_keys = [call[0][2] for call in calls]
-        assert "assets/default/templates/index.html" in s3_keys
+        assert "assets/default/templates/search.html" in s3_keys
         assert "assets/default/templates/subdir/page.html" in s3_keys
 
     def test_check_s3_path_exists_true(self, downloader):
@@ -285,26 +285,26 @@ class TestZeekerS3Downloader:
         """Test base assets setup when assets exist in S3"""
         downloader._check_base_assets_exist = Mock(return_value=True)
         downloader._download_base_assets = Mock(return_value=True)
-        downloader._upload_base_assets = Mock()
+        downloader.upload_base_assets = Mock()
 
         result = downloader._setup_base_assets()
 
         assert result is True
         downloader._download_base_assets.assert_called_once()
-        downloader._upload_base_assets.assert_not_called()
+        downloader.upload_base_assets.assert_not_called()
 
     @patch("scripts.download_from_s3.boto3.client")
     def test_setup_base_assets_upload_path(self, mock_boto3, downloader):
         """Test base assets setup when assets don't exist in S3"""
         downloader._check_base_assets_exist = Mock(return_value=False)
         downloader._download_base_assets = Mock()
-        downloader._upload_base_assets = Mock(return_value=True)
+        downloader.upload_base_assets = Mock(return_value=True)
 
         result = downloader._setup_base_assets()
 
         assert result is True
         downloader._download_base_assets.assert_not_called()
-        downloader._upload_base_assets.assert_called_once()
+        downloader.upload_base_assets.assert_called_once()
 
     @patch("scripts.download_from_s3.boto3.client")
     def test_apply_database_customizations_no_assets(self, mock_boto3, downloader):
@@ -453,7 +453,7 @@ class TestIntegration:
             metadata_file.write_text(json.dumps(initial_metadata, indent=2))
 
             # Create some initial template files
-            (templates_dir / "index.html").write_text("<html>Base Index</html>")
+            (templates_dir / "search.html").write_text("<html>Base Index</html>")
             (static_dir / "style.css").write_text("body { color: black; }")
 
             yield {

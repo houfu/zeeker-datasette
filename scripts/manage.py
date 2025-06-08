@@ -21,6 +21,7 @@ from pathlib import Path
 
 import boto3
 import click
+from botocore.config import Config
 from dotenv import load_dotenv
 
 
@@ -79,7 +80,6 @@ def calculate_directory_hash(directory):
 def download_from_s3_to_dir(target_dir, logger):
     """Download databases from S3 to specific directory"""
     s3_bucket = os.environ.get("S3_BUCKET")
-    aws_region = os.environ.get("AWS_REGION", "us-east-1")
 
     if not s3_bucket:
         logger.error("S3_BUCKET environment variable is required")
@@ -89,12 +89,7 @@ def download_from_s3_to_dir(target_dir, logger):
     target_path.mkdir(exist_ok=True, parents=True)
 
     try:
-        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
-        s3 = boto3.client(
-            "s3",
-            region_name=aws_region,
-            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
-        )
+        s3 = get_s3_client()
 
         logger.info(f"Downloading from s3://{s3_bucket}/latest")
 
@@ -348,7 +343,7 @@ def sync_assets(upload_base, force, verbose):
                 from download_from_s3 import ZeekerS3Downloader
 
             downloader = ZeekerS3Downloader()
-            success = downloader._upload_base_assets()
+            success = downloader.upload_base_assets()
 
             if success:
                 logger.info("✅ Successfully uploaded base assets to S3")
@@ -398,14 +393,7 @@ def list_databases(verbose):
         return
 
     try:
-        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
-        aws_region = os.environ.get("AWS_REGION", "us-east-1")
-
-        s3 = boto3.client(
-            "s3",
-            region_name=aws_region,
-            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
-        )
+        s3 = get_s3_client()
 
         click.echo(f"📊 Databases in S3 bucket: {s3_bucket}")
         click.echo()
@@ -525,6 +513,24 @@ def list_databases(verbose):
         logger.error(f"Failed to list databases: {e}")
 
 
+def get_s3_client():
+    s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
+    aws_region = os.environ.get("AWS_REGION", "us-east-1")
+    s3 = boto3.client(
+        "s3",
+        region_name=aws_region,
+        endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
+        config=Config(
+            s3={
+                'payload_signing_enabled': False
+            },
+            response_checksum_validation="when_required",
+            request_checksum_calculation="when_required",
+        )
+    )
+    return s3
+
+
 @cli.command()
 @click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
 def check_assets(verbose):
@@ -542,14 +548,8 @@ def check_assets(verbose):
         return
 
     try:
-        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
-        aws_region = os.environ.get("AWS_REGION", "us-east-1")
 
-        s3 = boto3.client(
-            "s3",
-            region_name=aws_region,
-            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
-        )
+        s3 = get_s3_client()
 
         click.echo(f"🔍 Checking assets in S3 bucket: {s3_bucket}")
         click.echo()
@@ -559,7 +559,7 @@ def check_assets(verbose):
 
         required_base_assets = [
             "assets/default/metadata.json",
-            "assets/default/templates/index.html",
+            "assets/default/templates/search.html",
             "assets/default/templates/database.html",
             "assets/default/templates/table.html",
             "assets/default/static/css/zeeker-theme.css",
@@ -623,14 +623,7 @@ def test_s3_connection(verbose):
         return
 
     try:
-        s3_endpoint_url = os.environ.get("S3_ENDPOINT_URL")
-        aws_region = os.environ.get("AWS_REGION", "us-east-1")
-
-        s3 = boto3.client(
-            "s3",
-            region_name=aws_region,
-            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
-        )
+        s3 = get_s3_client()
 
         # Test bucket access
         click.echo(f"Testing connection to bucket: {s3_bucket}")

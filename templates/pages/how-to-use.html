@@ -1,0 +1,383 @@
+{% extends "default:base.html" %}
+
+{% block extra_head %}
+<meta name="description" content="Practical guide for legal researchers and hackers - get the most out of Singapore legal data">
+<meta name="keywords" content="Singapore law, legal data, research guide, SQL tutorials">
+{% endblock %}
+
+{% block nav %}
+{% include "_header.html" %}
+{% endblock %}
+
+{% block title %}How to Use This Site - data.zeeker.sg{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="guide-hero">
+        <h1>📚 How to Use This Site</h1>
+        <p>
+            A practical guide for legal researchers, academics, and anyone who wants to
+            dig into Singapore legal data. No corporate jargon, just useful techniques.
+        </p>
+    </div>
+
+    <section class="quick-overview">
+        <div class="card">
+            <h2>🎯 What You Can Do Here</h2>
+            <p>
+                This site contains Singapore legal news and (soon) court decisions in a searchable database.
+                You can search through it, run custom queries, and export data for your own analysis.
+            </p>
+
+            <div class="method-cards">
+                <div class="method-card">
+                    <div class="method-number">1</div>
+                    <h3>🔍 Search Everything</h3>
+                    <p>Full-text search across all legal documents. Good for finding specific cases or topics.</p>
+                    <a href="/-/search" class="btn btn-primary">Try Global Search</a>
+                </div>
+
+                <div class="method-card">
+                    <div class="method-number">2</div>
+                    <h3>📊 Browse by Database</h3>
+                    <p>Explore structured data table by table. See what's available and get a feel for the data.</p>
+                    <a href="/" class="btn btn-primary">Browse Databases</a>
+                </div>
+
+                <div class="method-card">
+                    <div class="method-number">3</div>
+                    <h3>💻 Query with SQL</h3>
+                    <p>Write custom queries to slice and dice the data however you need. Don't worry, we'll help.</p>
+                    <a href="/sglawwatch?sql=" class="btn btn-primary">Open SQL Editor</a>
+                </div>
+
+                <div class="method-card">
+                    <div class="method-number">4</div>
+                    <h3>📈 Export Your Results</h3>
+                    <p>Download search results or query outputs as JSON, CSV, or SQLite files for further analysis.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="use-cases">
+        <h2>🛠️ Common Legal Research Tasks</h2>
+        <p>Here's how to tackle typical legal research questions using this site:</p>
+
+        <div class="use-case-grid">
+            <div class="use-case">
+                <h3>📰 Track Legal Developments</h3>
+                <p><strong>Goal:</strong> Stay updated on specific areas of law</p>
+                <p><strong>Method:</strong> Use search with focused keywords, then bookmark the URL to check regularly.</p>
+
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>Search for: "intellectual property"
+Then bookmark: /-/search?q=intellectual+property</code></pre>
+                </div>
+
+                <a href="/-/search?q=intellectual+property" class="try-button">🔗 Try This Search</a>
+            </div>
+
+            <div class="use-case">
+                <h3>📊 Analyze Legal Topic Trends</h3>
+                <p><strong>Goal:</strong> See how often certain topics appear over time</p>
+                <p><strong>Method:</strong> SQL query to count mentions by month/year</p>
+
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT strftime('%Y-%m', date) as month,
+       COUNT(*) as mentions
+FROM headlines
+WHERE LOWER(text) LIKE '%employment%'
+   OR LOWER(title) LIKE '%employment%'
+GROUP BY month
+HAVING month IS NOT NULL
+ORDER BY month DESC</code></pre>
+                </div>
+
+                <a href="/sglawwatch?sql=SELECT+strftime%28%27%25Y-%25m%27%2C+date%29+as+month%2C%0A+++++++COUNT%28*%29+as+mentions+%0AFROM+headlines+%0AWHERE+LOWER%28text%29+LIKE+%27%25employment%25%27%0A+++OR+LOWER%28title%29+LIKE+%27%25employment%25%27%0AGROUP+BY+month+%0AHAVING+month+IS+NOT+NULL%0AORDER+BY+month+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="use-case">
+                <h3>🔍 Find Case References</h3>
+                <p><strong>Goal:</strong> Locate mentions of specific cases or legal principles</p>
+                <p><strong>Method:</strong> Search with case names, citations, or legal concepts</p>
+
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>Search for: "[2024] SGCA"
+Or: "Spandeck Engineering"
+Or: "duty of care"</code></pre>
+                </div>
+
+                <a href="/-/search?q=%5B2024%5D+SGCA" class="try-button">🔗 Try Case Citation Search</a>
+            </div>
+
+            <div class="use-case">
+                <h3>📈 Export for Analysis</h3>
+                <p><strong>Goal:</strong> Get data into Excel, R, Python, etc. for deeper analysis</p>
+                <p><strong>Method:</strong> Add .csv or .json to any URL</p>
+
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>Any search: /-/search.csv?q=your+search
+All headlines: /sglawwatch/headlines.csv
+Custom query: /sglawwatch.csv?sql=your+query</code></pre>
+                </div>
+
+                <div class="export-formats">
+                    <span class="format-badge">.json</span>
+                    <span class="format-badge">.csv</span>
+                    <span class="format-badge">.db</span>
+                </div>
+
+                <a href="/sglawwatch/headlines.csv?_size=100" class="try-button">🔗 Download Sample CSV</a>
+            </div>
+        </div>
+    </section>
+
+    <div class="sql-helper">
+        <h2>💻 SQL for Legal Researchers</h2>
+        <p>
+            SQL might look intimidating, but it's just a way to ask specific questions about data.
+            Here are the most useful patterns for legal research:
+        </p>
+
+        <div class="sql-examples">
+            <div class="sql-example">
+                <h4>📅 Find Recent Headlines</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
+FROM headlines
+WHERE date > '2024-01-01'
+ORDER BY date DESC
+LIMIT 20</code></pre>
+                </div>
+                <p><em>Gets the 20 most recent headlines since January 2024</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+date+%3E+%272024-01-01%27+%0AORDER+BY+date+DESC+%0ALIMIT+20" class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="sql-example">
+                <h4>🔍 Search for Negligence Cases</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
+FROM headlines
+WHERE LOWER(text) LIKE '%negligence%'
+   OR LOWER(title) LIKE '%negligence%'
+ORDER BY date DESC</code></pre>
+                </div>
+                <p><em>Finds all headlines mentioning "negligence" anywhere in title or text</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+LOWER%28text%29+LIKE+%27%25negligence%25%27+%0A+++OR+LOWER%28title%29+LIKE+%27%25negligence%25%27%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="sql-example">
+                <h4>📊 Contract Mentions Over Time</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT strftime('%Y-%m', date) as month,
+       COUNT(*) as mentions
+FROM headlines
+WHERE LOWER(text) LIKE '%contract%'
+   OR LOWER(title) LIKE '%contract%'
+GROUP BY month
+HAVING month IS NOT NULL
+ORDER BY month DESC
+LIMIT 24</code></pre>
+                </div>
+                <p><em>Shows contract-related headlines by month for the last 2 years</em></p>
+                <a href="/sglawwatch?sql=--+Contract+mentions+over+time%0D%0ASELECT%0D%0A++strftime%28%27%25Y-%25m%27%2C+date%29+as+month%2C%0D%0A++COUNT%28*%29+as+mentions%0D%0AFROM%0D%0A++headlines%0D%0AWHERE%0D%0A++LOWER%28text%29+LIKE+%27%25contract%25%27%0D%0A++OR+LOWER%28title%29+LIKE+%27%25contract%25%27%0D%0AGROUP+BY%0D%0A++month%0D%0AHAVING%0D%0A++month+IS+NOT+NULL%0D%0AORDER+BY%0D%0A++month+DESC%0D%0ALIMIT%0D%0A++24%3B" class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="sql-example">
+                <h4>🎯 Complex Legal Search</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
+FROM headlines
+WHERE (LOWER(text) LIKE '%intellectual property%'
+   OR LOWER(text) LIKE '%copyright%'
+   OR LOWER(text) LIKE '%patent%')
+   AND date > '2023-01-01'
+ORDER BY date DESC</code></pre>
+                </div>
+                <p><em>IP-related headlines from 2023 onwards</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+%28LOWER%28text%29+LIKE+%27%25intellectual+property%25%27+%0A+++OR+LOWER%28text%29+LIKE+%27%25copyright%25%27%0A+++OR+LOWER%28text%29+LIKE+%27%25patent%25%27%29+%0A+++AND+date+%3E+%272023-01-01%27+%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="sql-example">
+                <h4>⚖️ Find Case Citations</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
+FROM headlines
+WHERE text LIKE '%[2024]%'
+   OR text LIKE '%[2023]%'
+   OR text LIKE '%SGCA%'
+   OR text LIKE '%SGHC%'
+ORDER BY date DESC</code></pre>
+                </div>
+                <p><em>Headlines containing legal citations from Singapore courts</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+text+LIKE+%27%25%5B2024%5D%25%27+%0A+++OR+text+LIKE+%27%25%5B2023%5D%25%27%0A+++OR+text+LIKE+%27%25SGCA%25%27%0A+++OR+text+LIKE+%27%25SGHC%25%27%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
+
+            <div class="sql-example">
+                <h4>📈 Weekly Activity Trends</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT
+  strftime('%Y-W%W', date) as week,
+  COUNT(*) as headlines_count
+FROM
+  headlines
+WHERE
+  date >= '2024-01-01'
+  AND date IS NOT NULL
+GROUP BY
+  strftime('%Y-W%W', date)
+ORDER BY
+  strftime('%Y-W%W', date) DESC
+LIMIT
+  12</code></pre>
+                </div>
+                <p><em>Weekly headline counts for the last 12 weeks</em></p>
+                <a href="/sglawwatch?sql=SELECT+strftime%28%27%25Y-W%25W%27%2C+date%29+as+week%2C%0A+++++++COUNT%28*%29+as+headlines_count%0AFROM+headlines%0AWHERE+date+%3E%3D+%272024-01-01%27%0A++AND+date+IS+NOT+NULL%0AGROUP+BY+strftime%28%27%25Y-W%25W%27%2C+date%29%0AORDER+BY+strftime%28%27%25Y-W%25W%27%2C+date%29+DESC%0ALIMIT+12" class="try-button">🔗 Try This Query</a>
+            </div>
+        </div>
+
+        <div class="tip-box">
+            <h4>💡 SQL Tips for Legal Research</h4>
+            <ul>
+                <li><strong>Use % as wildcard:</strong> <code>'%contract%'</code> finds "contract", "contracts", "contractual"</li>
+                <li><strong>Combine searches:</strong> <code>OR</code> for either term, <code>AND</code> for both terms</li>
+                <li><strong>Sort results:</strong> <code>ORDER BY date DESC</code> for newest first</li>
+                <li><strong>Limit results:</strong> <code>LIMIT 50</code> to avoid overwhelming output</li>
+                <li><strong>Date ranges:</strong> <code>date BETWEEN '2023-01-01' AND '2023-12-31'</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <section class="getting-data-out">
+        <div class="card">
+            <h2>📤 Getting Data Out</h2>
+            <p>Once you've found what you need, here's how to export it for further analysis:</p>
+
+            <div class="method-cards">
+                <div class="method-card">
+                    <h3>📊 For Excel/Google Sheets</h3>
+                    <p>Add <code>.csv</code> to any URL. CSV files open directly in spreadsheet software.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>/-/search.csv?q=employment+law
+/sglawwatch/headlines.csv?_size=1000</code></pre>
+                    </div>
+                    <a href="/sglawwatch/headlines.csv?_size=50" class="try-button">🔗 Try CSV Export</a>
+                </div>
+
+                <div class="method-card">
+                    <h3>🤖 For Programming (Python/R/etc)</h3>
+                    <p>Add <code>.json</code> to any URL. JSON is easier to work with in code.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>import requests
+url = 'https://data.zeeker.sg/sglawwatch/headlines.json'
+data = requests.get(url).json()</code></pre>
+                    </div>
+                    <a href="/sglawwatch/headlines.json?_size=10" class="try-button">🔗 Try JSON Export</a>
+                </div>
+
+                <div class="method-card">
+                    <h3>💾 Entire Database</h3>
+                    <p>Download the full SQLite database file for offline analysis.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>/sglawwatch.db
+# Opens in DB Browser for SQLite, etc.</code></pre>
+                    </div>
+                    <a href="/sglawwatch.db" class="try-button">🔗 Download Database</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="advanced-tips">
+        <div class="card">
+            <h2>🎓 Advanced Techniques</h2>
+
+            <div class="use-case-grid">
+                <div class="use-case">
+                    <h3>🔗 Bookmarkable Searches</h3>
+                    <p>Every search and query creates a unique URL you can bookmark or share.</p>
+                    <div class="tip-box">
+                        <h4>💡 Pro Tip</h4>
+                        <p>Create bookmarks for regular searches like "privacy law updates" or "employment tribunal decisions"</p>
+                    </div>
+                </div>
+
+                <div class="use-case">
+                    <h3>📱 Mobile Access</h3>
+                    <p>The site works on phones/tablets. Great for checking references while in court or meetings.</p>
+                </div>
+
+                <div class="use-case">
+                    <h3>🔄 Automated Monitoring</h3>
+                    <p>Use tools like IFTTT or Zapier to monitor JSON endpoints for new data matching your criteria.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>Check: /sglawwatch/headlines.json?_search=privacy&_size=1
+If row count increases, trigger alert</code></pre>
+                    </div>
+                </div>
+
+                <div class="use-case">
+                    <h3>🎯 Citation Analysis</h3>
+                    <p>Search for case citations to see how often cases are referenced in legal news.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>Search: "[2024] SGCA 15"
+Or: "Spandeck Engineering"
+Or: "Carrian Investments"</code></pre>
+                    </div>
+                    <a href="/-/search?q=Spandeck+Engineering" class="try-button">🔗 Try Citation Search</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="help-section">
+        <div class="card">
+            <h2>🤝 Need Help?</h2>
+            <p>This is a personal project, but I'm happy to help if you get stuck:</p>
+
+            <div class="method-cards">
+                <div class="method-card">
+                    <h3>📧 Email Questions</h3>
+                    <p>For help with specific queries or if something's broken</p>
+                    <a href="mailto:hello@zeeker.sg" class="btn btn-primary">hello@zeeker.sg</a>
+                </div>
+
+                <div class="method-card">
+                    <h3>💡 Suggest Features</h3>
+                    <p>Ideas for new data sources or analysis features</p>
+                    <p><em>Just drop me a line with your use case</em></p>
+                </div>
+
+                <div class="method-card">
+                    <h3>📚 More Resources</h3>
+                    <ul style="text-align: left;">
+                        <li><a href="/sources">Data Sources & Attribution</a></li>
+                        <li><a href="https://docs.datasette.io/" target="_blank">Datasette Documentation</a> (the underlying platform)</li>
+                        <li><a href="https://sqlitebrowser.org/" target="_blank">DB Browser for SQLite</a> (for offline analysis)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block footer %}
+{% include "_footer.html" %}
+{% endblock %}

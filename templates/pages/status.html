@@ -1,0 +1,185 @@
+{% extends "default:base.html" %}
+
+{% block nav %}
+{% include "_header.html" %}
+{% endblock %}
+
+{% block title %}{{ s('changelog_title') }} - {{ s('site_title') }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div style="text-align: center; padding: 2rem 0;">
+        <h1>{{ s('changelog_title') }}</h1>
+        <p style="font-size: 1.2rem; color: var(--color-text-secondary);">
+            {{ s('changelog_subtitle') }}
+        </p>
+    </div>
+
+    <!-- System Stats -->
+    <section class="system-stats">
+        <div class="card">
+            <h2>📊 Current System</h2>
+
+            <div class="stats-simple">
+                <div class="stat-item">
+                    <span class="stat-number">{{ system_stats.total_databases }}</span>
+                    <span class="stat-label">{{ s('stats_databases') }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ "{:,}".format(system_stats.total_tables) }}</span>
+                    <span class="stat-label">{{ s('stats_tables') }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">{{ "{:,}".format(system_stats.total_rows) }}</span>
+                    <span class="stat-label">{{ s('stats_rows') }}</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Recent Updates Timeline -->
+    <section class="updates-section">
+        <div class="card">
+            <h2>📅 {{ s('recent_updates_title') }}</h2>
+
+            <div class="timeline">
+                {% for update in strings.recent_updates %}
+                <div class="timeline-item">
+                    <div class="timeline-date">{{ update.date }}</div>
+                    <div class="timeline-content">
+                        <div class="update-type-badge update-type-{{ update.type }}">
+                            {{ update.type|title }}
+                        </div>
+                        <h3>{{ update.title }}</h3>
+                        <p>{{ update.description }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Simple CTA -->
+    <section class="status-footer">
+        <div class="card" style="text-align: center;">
+            <p>Questions or suggestions? <a href="mailto:hello@zeeker.sg">Get in touch</a></p>
+        </div>
+    </section>
+</div>
+
+<style>
+/* Simple stats display */
+.stats-simple {
+    display: flex;
+    gap: var(--space-xl);
+    justify-content: center;
+    margin-top: var(--space-lg);
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    text-align: center;
+    min-width: 120px;
+}
+
+.stat-number {
+    display: block;
+    font-size: var(--text-3xl);
+    font-weight: 700;
+    color: var(--color-accent-cyan);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: var(--text-sm);
+    color: var(--color-text-muted);
+    margin-top: var(--space-xs);
+}
+
+/* Simple timeline */
+.timeline {
+    margin-top: var(--space-lg);
+}
+
+.timeline-item {
+    display: flex;
+    gap: var(--space-lg);
+    padding: var(--space-lg) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.timeline-item:last-child {
+    border-bottom: none;
+}
+
+.timeline-date {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.timeline-content {
+    flex: 1;
+}
+
+.update-type-badge {
+    display: inline-block;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    margin-bottom: var(--space-sm);
+}
+
+.update-type-feature {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10B981;
+}
+
+.update-type-data {
+    background: rgba(0, 212, 255, 0.2);
+    color: var(--color-accent-cyan);
+}
+
+.update-type-technical {
+    background: rgba(255, 0, 110, 0.2);
+    color: var(--color-accent-magenta);
+}
+
+.timeline-content h3 {
+    margin: 0 0 var(--space-xs) 0;
+    color: var(--color-text-primary);
+    font-size: var(--text-lg);
+}
+
+.timeline-content p {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .stats-simple {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-lg);
+    }
+
+    .timeline-item {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+
+    .timeline-date {
+        min-width: auto;
+    }
+}
+</style>
+{% endblock %}
+
+{% block footer %}
+{% include "_footer.html" %}
+{% endblock %}

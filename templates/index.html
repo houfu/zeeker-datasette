@@ -2,10 +2,12 @@
 
 {% block extra_head %}
 {{ super() }}
-<meta name="description" content="Zeeker - Singapore's tech-forward legal data backbone for data applications and AI. Professional access to court decisions, legal documents, and regulatory information.">
-<meta name="keywords" content="Singapore law, legal data, court decisions, legal documents, AI training data, legal research">
-<meta property="og:title" content="data.zeeker.sg - The Legal Data Backbone of the Zeeker Project">
-<meta property="og:description" content="A datastore to Singapore's legal data for data applications and AI">
+<meta name="description"
+      content="Explore Singapore legal data through search and SQL queries. Legal news database with court cases coming soon.">
+<meta name="keywords" content="Singapore law, legal data, court decisions, legal research">
+<meta property="og:title" content="data.zeeker.sg - Explore Singapore Legal Data">
+<meta property="og:description"
+      content="Search and query Singapore legal data - legal news database with court cases coming soon">
 <meta property="og:type" content="website">
 
 <!-- Preload critical hero image -->
@@ -13,21 +15,7 @@
 {% endblock %}
 
 {% block nav %}
-<header>
-  <div class="header-content">
-    <div class="header-left">
-      <div class="logo">data.zeeker.sg</div>
-      <div class="tagline">The Legal Data Backbone of the Zeeker Project</div>
-    </div>
-    <nav>
-      <ul>
-        <li><a href="/">Home</a></li>
-        <li><a href="/-/metadata">API Info</a></li>
-        <li><a href="/templates/pages/about">About</a></li>
-      </ul>
-    </nav>
-  </div>
-</header>
+{% include "_header.html" %}
 {% endblock %}
 
 {% block content %}
@@ -37,52 +25,52 @@
         <picture class="hero-background-picture">
             <!-- WebP versions for modern browsers -->
             <source
-                media="(max-width: 768px)"
-                srcset="/static/images/supcourt-sg-mobile.webp"
-                type="image/webp">
+                    media="(max-width: 768px)"
+                    srcset="/static/images/supcourt-sg-mobile.webp"
+                    type="image/webp">
             <source
-                media="(max-width: 1024px)"
-                srcset="/static/images/supcourt-sg-tablet.webp"
-                type="image/webp">
+                    media="(max-width: 1024px)"
+                    srcset="/static/images/supcourt-sg-tablet.webp"
+                    type="image/webp">
             <source
-                media="(min-width: 1025px)"
-                srcset="/static/images/supcourt-sg.webp"
-                type="image/webp">
+                    media="(min-width: 1025px)"
+                    srcset="/static/images/supcourt-sg.webp"
+                    type="image/webp">
 
             <!-- PNG fallbacks -->
             <source
-                media="(max-width: 768px)"
-                srcset="/static/images/supcourt-sg-mobile.png">
+                    media="(max-width: 768px)"
+                    srcset="/static/images/supcourt-sg-mobile.png">
             <source
-                media="(max-width: 1024px)"
-                srcset="/static/images/supcourt-sg-tablet.png">
+                    media="(max-width: 1024px)"
+                    srcset="/static/images/supcourt-sg-tablet.png">
 
             <!-- Default fallback -->
             <img
-                src="/static/images/supcourt-sg.png"
-                alt="Singapore Supreme Court"
-                class="hero-background-image loading"
-                loading="eager">
+                    src="/static/images/supcourt-sg.png"
+                    alt="Singapore Supreme Court"
+                    class="hero-background-image loading"
+                    loading="eager">
         </picture>
         <div class="hero-overlay-gradient"></div>
     </div>
 
     <div class="hero-content-wrapper">
         <div class="hero-glass-card">
-            <h1 class="hero-title-main">data.zeeker.sg</h1>
+            <h1 class="hero-title-main">{{ str_site_title }}</h1>
             <p class="hero-tagline-main">
-                Singapore's premier legal data backbone for research, analysis, and AI innovation
+                Explore Singapore legal data through search and SQL queries
             </p>
 
             <div class="hero-search-container">
                 <form class="hero-search-form" action="/-/search">
                     <div class="hero-search-wrapper">
                         <input
-                            type="search"
-                            name="q"
-                            class="hero-search-input"
-                            placeholder="Search across all legal databases..."
-                            aria-label="Search legal data"
+                                type="search"
+                                name="q"
+                                class="hero-search-input"
+                                placeholder="Search legal news, cases, decisions..."
+                                aria-label="Search legal data"
                         >
                     </div>
                 </form>
@@ -92,24 +80,6 @@
                 <a href="/-/search" class="cta-primary">
                     🔍 Start Searching
                 </a>
-                <a href="/-/metadata" class="cta-secondary">
-                    📊 Explore API
-                </a>
-            </div>
-
-            <div class="hero-features">
-                <div class="hero-feature">
-                    <span class="hero-feature-icon">🏛️</span>
-                    <span>10K+ Court Decisions</span>
-                </div>
-                <div class="hero-feature">
-                    <span class="hero-feature-icon">📊</span>
-                    <span>RESTful API Access</span>
-                </div>
-                <div class="hero-feature">
-                    <span class="hero-feature-icon">🔒</span>
-                    <span>Immutable Data</span>
-                </div>
             </div>
         </div>
     </div>
@@ -120,75 +90,50 @@
 
 {% if databases %}
 <section class="databases-section">
-  <h2>Available Legal Resources</h2>
-  <div class="database-grid">
-    {% for database in databases %}
-    <div class="card database-card">
-      <h3>
-        <a href="/{{ database.name }}">{{ database.name|title }}</a>
-      </h3>
-      <div class="database-meta">
-        {% if database.table_count is defined and database.table_count %}
-        <span class="table-count">{{ database.table_count }} table{{ database.table_count|pluralize }}</span>
-        {% endif %}
-        {% if database.size is defined and database.size %}
-        <span class="database-size">{{ database.size|filesizeformat }}</span>
-        {% endif %}
-      </div>
-      {% if database.description %}
-      <p class="database-description">{{ database.description }}</p>
-      {% endif %}
+    <h2>Available Data</h2>
+    <div class="database-grid">
+        {% for database in databases %}
+        <div class="card database-card">
+            <h3>
+                <a href="/{{ database.name }}">{{ database.name|title }}</a>
+            </h3>
+            <div class="database-meta">
+                {% if database.table_count is defined and database.table_count %}
+                <span class="table-count">{{ database.table_count }} table{{ database.table_count|pluralize }}</span>
+                {% endif %}
+                {% if database.size is defined and database.size %}
+                <span class="database-size">{{ database.size|filesizeformat }}</span>
+                {% endif %}
+            </div>
+            {% if database.description %}
+            <p class="database-description">{{ database.description }}</p>
+            {% endif %}
 
-      <div class="database-actions">
-        <a href="/{{ database.name }}" class="btn">Explore Data</a>
-        <a href="/{{ database.name }}.json" class="btn btn-secondary">API</a>
-      </div>
+            <div class="database-actions">
+                <a href="/{{ database.name }}" class="btn">Explore Data</a>
+                <a href="/{{ database.name }}.json" class="btn btn-secondary">JSON</a>
+            </div>
 
-      {% if database.tables %}
-      <div class="table-preview">
-        <h4>Key Tables:</h4>
-        <ul>
-          {% for table in database.tables[:3] %}
-          <li>
-            <a href="/{{ database.name }}/{{ table.name }}">{{ table.name|title }}</a>
-            {% if table.count is defined and table.count %}<span class="row-count">({{ table.count|safe_format }} rows)</span>{% endif %}
-          </li>
-          {% endfor %}
-          {% if database.tables|length > 3 %}
-          <li><em>...and {{ database.tables|length - 3 }} more</em></li>
-          {% endif %}
-        </ul>
-      </div>
-      {% endif %}
+            {% if database.tables %}
+            <div class="table-preview">
+                <h4>Key Tables:</h4>
+                <ul>
+                    {% for table in database.tables[:3] %}
+                    <li>
+                        <a href="/{{ database.name }}/{{ table.name }}">{{ table.name|title }}</a>
+                        {% if table.count is defined and table.count %}<span class="row-count">({{ table.count|safe_format }} rows)</span>{%
+                        endif %}
+                    </li>
+                    {% endfor %}
+                    {% if database.tables|length > 3 %}
+                    <li><em>...and {{ database.tables|length - 3 }} more</em></li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-  </div>
-</section>
-{% else %}
-<section class="no-databases">
-  <div class="card">
-    <h2>🚀 Setting Up Your Legal Data</h2>
-    <p>This Zeeker instance is ready to serve Singapore's legal data. Databases will appear here once they're loaded from your configured S3 bucket.</p>
-
-    <div class="features-grid">
-      <div class="feature">
-        <h3>📊 Immutable Data Access</h3>
-        <p>All legal data is served in read-only mode, ensuring data integrity and compliance.</p>
-      </div>
-      <div class="feature">
-        <h3>🔍 Full-Text Search</h3>
-        <p>Search across all legal documents, court decisions, and regulatory texts instantly.</p>
-      </div>
-      <div class="feature">
-        <h3>🛠️ RESTful API</h3>
-        <p>Programmatic access to all data with JSON and CSV export capabilities.</p>
-      </div>
-      <div class="feature">
-        <h3>⚡ AI-Ready</h3>
-        <p>Structured legal data perfect for machine learning, natural language processing, and legal tech applications.</p>
-      </div>
-    </div>
-  </div>
 </section>
 {% endif %}
 
@@ -196,103 +141,48 @@
 <div class="section-spacer"></div>
 
 <section class="about-section">
-  <div class="card">
-    <h2>About This Platform</h2>
-    <p>Zeeker provides professional-grade access to Singapore's legal data ecosystem. Our platform automatically downloads and serves legal databases from secure cloud storage, offering researchers, legal professionals, and technologists reliable access to:</p>
-    
-    <div class="resource-categories">
-      <div class="category">
-        <h3>🏛️ Courts</h3>
-        <p>Supreme Court decisions, High Court judgments, and appellate rulings</p>
-      </div>
-      <div class="category">
-        <h3>🏛️ Government</h3>
-        <p>Parliamentary debates, legislative documents, and regulatory updates</p>
-      </div>
-      <div class="category">
-        <h3>📰 SG Law Watch</h3>
-        <p>Legal news, analysis, and industry developments</p>
-      </div>
-      <div class="category">
-        <h3>📋 Regulations</h3>
-        <p>Statutory instruments, guidelines, and compliance frameworks</p>
-      </div>
+    <div class="card">
+        <h2>What's Here</h2>
+        <p>Currently focusing on legal news data, with court decisions being added soon. All data is searchable and
+            available through a full SQL interface.</p>
+
+        <div class="features-list">
+            <h3>How to Use</h3>
+            <ul>
+                <li>🔍 <strong>Search</strong> - Full-text search across all legal documents</li>
+                <li>💻 <strong>SQL Queries</strong> - Write custom queries against the database</li>
+                <li>📊 <strong>Export Data</strong> - Download results as JSON or CSV</li>
+                <li>⚡ <strong>Updated Regularly</strong> - Data refreshes automatically</li>
+            </ul>
+        </div>
     </div>
-    
-    <div class="features-list">
-      <h3>Platform Features</h3>
-      <ul>
-        <li>Automatic database synchronization from cloud storage</li>
-        <li>Immutable data access ensuring consistency</li>
-        <li>Custom styling optimized for legal professionals</li>
-        <li>Full-text search across all resources</li>
-        <li>RESTful API for programmatic access</li>
-        <li>Export capabilities (JSON, CSV, SQL)</li>
-        <li>Mobile-responsive interface</li>
-        <li>Accessibility-compliant design</li>
-      </ul>
-    </div>
-  </div>
 </section>
 
-<section class="api-section">
-  <div class="card">
-    <h2>🔌 API Access</h2>
-    <p>Zeeker provides comprehensive API access to all legal data. Perfect for:</p>
-    
-    <div class="api-uses">
-      <div class="use-case">
-        <h3>🤖 AI & Machine Learning</h3>
-        <p>Train models on structured legal text, case outcomes, and regulatory patterns</p>
-      </div>
-      <div class="use-case">
-        <h3>📊 Legal Analytics</h3>
-        <p>Analyze trends in court decisions, regulatory changes, and legal precedents</p>
-      </div>
-      <div class="use-case">
-        <h3>🔍 Legal Research</h3>
-        <p>Programmatic access for legal research tools and citation analysis</p>
-      </div>
-      <div class="use-case">
-        <h3>🏢 Enterprise Integration</h3>
-        <p>Integrate legal data into business intelligence and compliance systems</p>
-      </div>
-    </div>
-    
-    <div class="api-example">
-      <h3>Quick Start</h3>
-      <pre><code># Get all databases
+<section class="sql-section">
+    <div class="card">
+        <h2>🔌 For Developers</h2>
+        <p>Full REST API access to all data. Perfect for building tools or conducting research.</p>
+
+        <div class="api-example">
+            <h3>Quick Examples</h3>
+            <pre><code># Get all databases
 curl https://data.zeeker.sg/.json
 
-# Search across all data  
+# Search all data
 curl "https://data.zeeker.sg/-/search.json?q=contract+law"
 
-# Query specific table
-curl "https://data.zeeker.sg/courts/supreme_court.json?_shape=array"</code></pre>
+# Custom SQL query
+curl "https://data.zeeker.sg/[database]?sql=SELECT * FROM [table] LIMIT 10"</code></pre>
+        </div>
+
+        <div class="api-links">
+            <a href="/how-to-use" class="btn">How to use</a>
+            <a href="/sglawwatch?sql=SELECT%20name%20FROM%20sqlite_master%20WHERE%20type%3D%27table%27"
+               class="btn btn-secondary">Try SQL Editor</a></div>
     </div>
-    
-    <div class="api-links">
-      <a href="/-/metadata" class="btn">View Full API Documentation</a>
-      <a href="/-/search" class="btn btn-secondary">Try Search API</a>
-    </div>
-  </div>
 </section>
 {% endblock %}
 
 {% block footer %}
-<footer>
-  <div class="footer-content">
-    <div class="footer-links">
-      <a href="/">Home</a>
-      <a href="/-/metadata">API Documentation</a>
-      <a href="/templates/pages/about">About</a>
-      <a href="/templates/pages/sources">Data Sources</a>
-      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">License (CC-BY-4.0)</a>
-    </div>
-    <div class="footer-text">
-      <p>&copy; 2025 Zeeker - Singapore Legal Data Backbone</p>
-      <p>Professional access to legal data for research, analysis, and AI applications</p>
-    </div>
-  </div>
-</footer>
+{% include "_footer.html" %}
 {% endblock %}

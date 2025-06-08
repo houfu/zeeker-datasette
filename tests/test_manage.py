@@ -312,7 +312,7 @@ class TestCliCommands:
 
             # Create test files
             (data_dir / "test.db").write_bytes(b"test database content")
-            (templates_dir / "index.html").write_text("<html>Test</html>")
+            (templates_dir / "search.html").write_text("<html>Test</html>")
             (static_dir / "style.css").write_text("body { color: black; }")
             metadata_file.write_text(json.dumps({"databases": {"test": {}}}))
 
@@ -493,7 +493,7 @@ class TestCliCommands:
         mock_s3_client.list_objects_v2.return_value = {
             "Contents": [
                 {"Key": "assets/default/metadata.json"},
-                {"Key": "assets/default/templates/index.html"},
+                {"Key": "assets/default/templates/search.html"},
                 {"Key": "assets/default/static/css/style.css"},
             ]
         }
@@ -794,7 +794,7 @@ class TestIntegrationScenarios:
             (data_dir / "courts.db").write_bytes(b"courts database")
             (data_dir / "parliament.db").write_bytes(b"parliament database")
 
-            (templates_dir / "index.html").write_text("<html>Index</html>")
+            (templates_dir / "search.html").write_text("<html>Index</html>")
             (templates_dir / "database-courts.html").write_text("<html>Courts</html>")
 
             (static_dir / "style.css").write_text("body { color: black; }")

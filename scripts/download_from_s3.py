@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Set
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 # Configure logging
@@ -28,12 +29,12 @@ class ZeekerS3Downloader:
     def __init__(self):
         self.s3_bucket = os.environ.get("S3_BUCKET")
 
-        # Local paths
-        self.data_dir = Path("/data")
-        self.templates_dir = Path("/app/templates")
-        self.static_dir = Path("/app/static")
-        self.plugins_dir = Path("/app/plugins")
-        self.metadata_file = Path("/app/metadata.json")
+        # Local paths, get from environment, otherwise use relative project paths
+        self.data_dir = Path(os.getenv("DATASETTE_DATABASE_DIR", "data"))
+        self.templates_dir = Path(os.getenv("DATASETTE_TEMPLATE_DIR", "templates"))
+        self.static_dir = Path(os.getenv("DATASETTE_STATIC_DIR", "static"))
+        self.plugins_dir = Path(os.getenv("DATASETTE_PLUGINS_DIR", "plugins"))
+        self.metadata_file = Path(os.getenv("DATASETTE_METADATA_FILE", "metadata.json"))
 
         # S3 paths (simplified structure)
         self.s3_databases_path = "latest"
@@ -55,7 +56,14 @@ class ZeekerS3Downloader:
         return boto3.client(
             "s3",
             region_name=aws_region,
-            endpoint_url=s3_endpoint_url if s3_endpoint_url else None
+            endpoint_url=s3_endpoint_url if s3_endpoint_url else None,
+            config=Config(
+                s3={
+                    'payload_signing_enabled': False
+                },
+                response_checksum_validation="when_required",
+                request_checksum_calculation="when_required",
+            )
         )
 
     def download_complete_setup(self) -> bool:
@@ -142,7 +150,7 @@ class ZeekerS3Downloader:
                 return self._download_base_assets()
             else:
                 logger.info("Base assets not found in S3, uploading local assets...")
-                return self._upload_base_assets()
+                return self.upload_base_assets()
 
         except Exception as e:
             logger.error(f"Error setting up base assets: {e}")
@@ -200,7 +208,7 @@ class ZeekerS3Downloader:
             logger.error(f"Error downloading base assets: {e}")
             return False
 
-    def _upload_base_assets(self) -> bool:
+    def upload_base_assets(self) -> bool:
         """Upload local assets to S3 as base assets."""
         try:
             # Upload templates

@@ -1,6 +1,6 @@
 /**
- * Zeeker Enhanced JavaScript - Cleaned Version
- * Streamlined functionality for hero banner and core features
+ * Zeeker Enhanced JavaScript - Consolidated Version
+ * Streamlined functionality with reusable components
  */
 
 class ZeekerEnhancer {
@@ -25,6 +25,8 @@ class ZeekerEnhancer {
         this.addCopyButtons();
         this.addKeyboardShortcuts();
         this.setupScrollToTop();
+        this.setupQueryHelpers();
+        this.setupExampleQueries();
 
         console.log('Zeeker Enhanced: Complete');
     }
@@ -98,13 +100,31 @@ class ZeekerEnhancer {
             const query = heroSearchInput.value.trim();
 
             if (query) {
+                // Add visual feedback
                 const wrapper = heroSearchInput.closest('.hero-search-wrapper');
-                wrapper.style.transform = 'scale(0.98)';
-                wrapper.style.opacity = '0.7';
+                if (wrapper) {
+                    wrapper.style.transform = 'scale(0.98)';
+                    wrapper.style.opacity = '0.7';
+                }
 
+                // Navigate to search page
                 setTimeout(() => {
-                    window.location.href = `/-/search?q=${encodeURIComponent(query)}`;
-                }, 300);
+                    const searchUrl = new URL('/-/search', window.location.origin);
+                    searchUrl.searchParams.set('q', query);
+                    window.location.href = searchUrl.toString();
+                }, 200);
+            }
+        });
+
+        // Enhanced keyboard support
+        heroSearchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                heroSearchForm.dispatchEvent(new Event('submit'));
+            }
+            if (e.key === 'Escape') {
+                heroSearchInput.blur();
+                heroSearchInput.value = '';
             }
         });
 
@@ -122,14 +142,6 @@ class ZeekerEnhancer {
             if (wrapper) {
                 wrapper.style.transform = 'translateY(0) scale(1)';
                 wrapper.style.boxShadow = '';
-            }
-        });
-
-        // Escape key
-        heroSearchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                heroSearchInput.blur();
-                heroSearchInput.value = '';
             }
         });
     }
@@ -184,54 +196,85 @@ class ZeekerEnhancer {
     }
 
     addCopyButtons() {
-        const codeElements = document.querySelectorAll('pre code, .highlight');
+        // Enhanced copy button functionality for code blocks
+        const codeElements = document.querySelectorAll('pre code, .highlight, .example-box pre');
 
         codeElements.forEach(element => {
+            // Skip if already processed
             if (element.closest('.copy-button-added')) return;
 
-            const wrapper = document.createElement('div');
-            wrapper.className = 'code-wrapper copy-button-added';
-            wrapper.style.position = 'relative';
+            const codeBlock = element.tagName === 'PRE' ? element : element.closest('pre');
+            if (!codeBlock) return;
 
-            element.parentNode.insertBefore(wrapper, element);
-            wrapper.appendChild(element);
+            // Check if parent already has copy button
+            if (codeBlock.parentElement.querySelector('.copy-btn')) return;
+
+            const wrapper = codeBlock.parentElement;
+            wrapper.classList.add('copy-button-added');
+            wrapper.style.position = 'relative';
 
             const copyButton = document.createElement('button');
             copyButton.className = 'copy-btn';
-            copyButton.innerHTML = '📋 Copy';
-            copyButton.style.cssText = `
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: var(--color-accent-primary);
-                color: white;
-                border: none;
-                padding: 0.4rem 0.8rem;
-                border-radius: 4px;
-                font-size: 0.8rem;
-                cursor: pointer;
-                z-index: 10;
-                transition: all 0.2s ease;
-            `;
+            copyButton.innerHTML = '📋';
+            copyButton.setAttribute('aria-label', 'Copy code');
+            copyButton.title = 'Copy to clipboard';
 
             copyButton.addEventListener('click', () => {
-                const text = element.textContent;
-                navigator.clipboard.writeText(text).then(() => {
-                    copyButton.innerHTML = '✅ Copied!';
-                    copyButton.style.background = 'var(--color-success, #10B981)';
-                    setTimeout(() => {
-                        copyButton.innerHTML = '📋 Copy';
-                        copyButton.style.background = 'var(--color-accent-primary)';
-                    }, 2000);
-                });
+                const text = element.textContent || codeBlock.textContent;
+                this.copyToClipboard(text, copyButton);
             });
 
             wrapper.appendChild(copyButton);
+        });
+
+        // Handle existing copy buttons (from templates)
+        document.querySelectorAll('.copy-btn').forEach(button => {
+            if (!button.hasAttribute('data-enhanced')) {
+                button.setAttribute('data-enhanced', 'true');
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const codeBlock = button.previousElementSibling;
+                    if (codeBlock) {
+                        const text = codeBlock.textContent;
+                        this.copyToClipboard(text, button);
+                    }
+                });
+            }
+        });
+    }
+
+    copyToClipboard(text, button) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = button.innerHTML;
+            const originalClass = button.className;
+
+            button.innerHTML = '✅';
+            button.classList.add('copied');
+
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.className = originalClass;
+            }, 2000);
+        }).catch(() => {
+            // Fallback for older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅';
+            setTimeout(() => {
+                button.innerHTML = originalText;
+            }, 2000);
         });
     }
 
     addKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
+            // Skip if typing in form fields
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
             switch (e.key) {
@@ -257,6 +300,11 @@ class ZeekerEnhancer {
                         window.history.back();
                     }
                     break;
+
+                case 'Escape':
+                    // Clear focus from active element
+                    document.activeElement?.blur();
+                    break;
             }
         });
     }
@@ -270,6 +318,7 @@ class ZeekerEnhancer {
             scrollToTopBtn = document.createElement('button');
             scrollToTopBtn.className = 'scroll-to-top';
             scrollToTopBtn.innerHTML = '↑';
+            scrollToTopBtn.setAttribute('aria-label', 'Scroll to top');
             scrollToTopBtn.style.cssText = `
                 position: fixed;
                 bottom: 2rem;
@@ -308,7 +357,209 @@ class ZeekerEnhancer {
             });
         });
     }
+
+    setupQueryHelpers() {
+        // SQL Query interface enhancements
+        const sqlTextarea = document.querySelector('.sql-textarea');
+        if (sqlTextarea) {
+            // Auto-save functionality
+            let autoSaveTimeout;
+            sqlTextarea.addEventListener('input', () => {
+                clearTimeout(autoSaveTimeout);
+                autoSaveTimeout = setTimeout(() => {
+                    if (sqlTextarea.value.trim()) {
+                        localStorage.setItem('zeeker_auto_saved_query', sqlTextarea.value);
+                    }
+                }, 2000);
+            });
+
+            // Load auto-saved query if textarea is empty
+            if (!sqlTextarea.value.trim()) {
+                const saved = localStorage.getItem('zeeker_auto_saved_query');
+                if (saved) {
+                    sqlTextarea.value = saved;
+                }
+            }
+
+            // SQL-specific shortcuts
+            sqlTextarea.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    e.preventDefault();
+                    const form = sqlTextarea.closest('form');
+                    if (form) form.submit();
+                }
+
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    const start = sqlTextarea.selectionStart;
+                    const end = sqlTextarea.selectionEnd;
+                    const value = sqlTextarea.value;
+                    sqlTextarea.value = value.substring(0, start) + '  ' + value.substring(end);
+                    sqlTextarea.selectionStart = sqlTextarea.selectionEnd = start + 2;
+                }
+            });
+        }
+
+        // Query result enhancements
+        this.enhanceQueryResults();
+    }
+
+    enhanceQueryResults() {
+        // Copy results functionality
+        const copyResultsButton = document.querySelector('[onclick="copyResults()"]');
+        if (copyResultsButton) {
+            copyResultsButton.onclick = null; // Remove inline handler
+            copyResultsButton.addEventListener('click', () => {
+                const table = document.querySelector('.query-results-table');
+                if (table) {
+                    const text = Array.from(table.querySelectorAll('tr')).map(row =>
+                        Array.from(row.querySelectorAll('th, td')).map(cell =>
+                            cell.textContent.trim()
+                        ).join('\t')
+                    ).join('\n');
+
+                    this.copyToClipboard(text, copyResultsButton);
+                }
+            });
+        }
+
+        // Enhanced table interactions
+        const resultTable = document.querySelector('.query-results-table');
+        if (resultTable) {
+            // Make cells selectable
+            resultTable.addEventListener('click', (e) => {
+                if (e.target.tagName === 'TD') {
+                    // Clear previous selections
+                    resultTable.querySelectorAll('.selected-cell').forEach(cell => {
+                        cell.classList.remove('selected-cell');
+                    });
+
+                    e.target.classList.add('selected-cell');
+
+                    // Copy cell content on double-click
+                    e.target.addEventListener('dblclick', () => {
+                        this.copyToClipboard(e.target.textContent.trim(), e.target);
+                    }, { once: true });
+                }
+            });
+        }
+    }
+
+    setupExampleQueries() {
+        // Enhanced example query functionality
+        const exampleButtons = document.querySelectorAll('[onclick*="useExample"]');
+        exampleButtons.forEach(button => {
+            // Remove inline onclick
+            button.onclick = null;
+
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                const codeBlock = button.previousElementSibling;
+                if (codeBlock && codeBlock.tagName === 'PRE') {
+                    const query = codeBlock.textContent.trim();
+                    const textarea = document.querySelector('.sql-textarea');
+                    if (textarea) {
+                        textarea.value = query;
+                        textarea.focus();
+
+                        // Visual feedback
+                        button.style.background = 'var(--color-success)';
+                        button.textContent = '✅ Added to Editor';
+                        setTimeout(() => {
+                            button.style.background = '';
+                            button.textContent = button.getAttribute('data-original-text') || '🔗 Try This Query';
+                        }, 2000);
+                    }
+                }
+            });
+
+            // Store original text
+            if (!button.getAttribute('data-original-text')) {
+                button.setAttribute('data-original-text', button.textContent);
+            }
+        });
+
+        // Query formatting helper
+        const formatButton = document.querySelector('[onclick="formatQuery()"]');
+        if (formatButton) {
+            formatButton.onclick = null;
+            formatButton.addEventListener('click', () => {
+                const textarea = document.querySelector('.sql-textarea');
+                if (textarea) {
+                    textarea.value = this.formatSQL(textarea.value);
+                }
+            });
+        }
+    }
+
+    formatSQL(sql) {
+        if (!sql.trim()) return sql;
+
+        // Basic SQL formatting
+        let formatted = sql
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|OUTER JOIN|ON|AND|OR|UNION|LIMIT|OFFSET)\b/gi, '\n$1')
+            .replace(/,(?!\s*\n)/g, ',\n  ') // Commas on new lines with indent
+            .replace(/\n\s*\n/g, '\n') // Remove empty lines
+            .trim();
+
+        return formatted;
+    }
+
+    // Utility methods
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    throttle(func, limit) {
+        let inThrottle;
+        return function() {
+            const args = arguments;
+            const context = this;
+            if (!inThrottle) {
+                func.apply(context, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    }
 }
+
+// Global functions for template compatibility
+window.copyCode = function(button) {
+    const codeBlock = button.nextElementSibling;
+    if (codeBlock) {
+        const text = codeBlock.textContent;
+
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = button.textContent;
+            button.textContent = '✅ Copied!';
+            button.style.background = '#10B981';
+
+            setTimeout(() => {
+                button.textContent = originalText;
+                button.style.background = '';
+            }, 2000);
+        });
+    }
+};
+
+window.useExample = function(button) {
+    const code = button.previousElementSibling.textContent;
+    const textarea = document.querySelector('.sql-textarea');
+    if (textarea) {
+        textarea.value = code.trim();
+        textarea.focus();
+    }
+};
 
 // Viewport height fix for mobile
 function updateViewportHeight() {
