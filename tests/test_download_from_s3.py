@@ -7,7 +7,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, ANY
 
 import pytest
 from botocore.exceptions import ClientError
@@ -94,12 +94,12 @@ class TestZeekerS3Downloader:
     def test_init_with_custom_endpoint(self):
         """Test initialization with custom S3 endpoint"""
         with patch.dict(
-            os.environ,
-            {
-                "S3_BUCKET": "test-bucket",
-                "S3_ENDPOINT_URL": "https://custom.endpoint.com",
-                "AWS_REGION": "us-west-2",
-            },
+                os.environ,
+                {
+                    "S3_BUCKET": "test-bucket",
+                    "S3_ENDPOINT_URL": "https://custom.endpoint.com",
+                    "AWS_REGION": "us-west-2",
+                },
         ):
             with patch("scripts.download_from_s3.boto3.client") as mock_boto3:
                 downloader = ZeekerS3Downloader()
@@ -107,7 +107,7 @@ class TestZeekerS3Downloader:
                     "s3",
                     region_name="us-west-2",
                     endpoint_url="https://custom.endpoint.com",
-                )
+                    config=ANY)
 
     @patch("scripts.download_from_s3.boto3.client")
     def test_download_database_files_success(self, mock_boto3, downloader, mock_s3_client):
@@ -318,6 +318,7 @@ class TestZeekerS3Downloader:
     @patch("scripts.download_from_s3.boto3.client")
     def test_apply_database_customizations_with_assets(self, mock_boto3, downloader):
         """Test applying database customizations when custom assets exist"""
+
         # Mock that main path exists, but sub-paths don't
         def check_path_side_effect(path):
             return path == "assets/databases/test_db"

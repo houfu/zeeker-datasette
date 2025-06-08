@@ -8,9 +8,10 @@ import os
 # Import the module under test
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, ANY
 
 import pytest
+from botocore.config import Config
 from click.testing import CliRunner
 
 from scripts import manage
@@ -89,7 +90,8 @@ class TestUtilityFunctions:
 
             # Verify boto3 client was called with correct parameters
             mock_boto3.assert_called_with(
-                "s3", region_name="us-west-2", endpoint_url=None
+                "s3", region_name="us-west-2", endpoint_url=None,
+                config=ANY
             )
 
     @patch("scripts.manage.boto3.client")
@@ -397,7 +399,7 @@ class TestCliCommands:
 
             assert result.exit_code == 0
             assert "Base assets uploaded to S3" in result.output
-            mock_downloader._upload_base_assets.assert_called_once()
+            mock_downloader.upload_base_assets.assert_called_once()
 
     @patch("scripts.manage.setup_logging")
     @patch("scripts.manage.load_dotenv")
@@ -706,6 +708,7 @@ class TestConfigurationHandling:
             "s3",
             region_name="us-east-1",  # Default region
             endpoint_url="https://custom.endpoint.com",
+            config=ANY
         )
 
 
