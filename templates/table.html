@@ -47,7 +47,7 @@
           {% if columns %}
           <div class="stat-item">
             <span class="stat-number">{{ columns|length }}</span>
-            <span class="stat-label">column{{ columns|length|pluralize }}</span>
+            <span class="stat-label">column{% if columns|length != 1 %}s{% endif %}</span>
           </div>
           {% endif %}
 
@@ -119,6 +119,159 @@
         <p>Basic statistics and data distribution</p>
         <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_rows+FROM+%22{{ table }}%22" class="btn">View Stats</a>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- SQL Examples specific to this table -->
+<section class="sql-examples-section">
+  <div class="card">
+    <h2>💻 SQL Examples for {{ table|title }}</h2>
+    <p>Ready-to-use queries for exploring {{ table }} data:</p>
+
+    <div class="examples-grid">
+      <div class="example-card">
+        <h4>📊 Basic Table Exploration</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Get first 20 rows
+SELECT *
+FROM "{{ table }}"
+LIMIT 20;</code></pre>
+        </div>
+        <p><em>Quick overview of table contents</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+20" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      <div class="example-card">
+        <h4>📈 Record Count</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Count total records
+SELECT COUNT(*) as total_records
+FROM "{{ table }}";</code></pre>
+        </div>
+        <p><em>See how many records are in this table</em></p>
+        <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_records+FROM+%22{{ table }}%22" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      {% if columns %}
+      {% set date_column = '' %}
+      {% set text_column = '' %}
+      {% set numeric_column = '' %}
+      {% for column in columns %}
+        {% if not date_column and column.name|lower in ['date', 'created_at', 'updated_at', 'published', 'timestamp'] %}
+          {% set date_column = column.name %}
+        {% endif %}
+        {% if not text_column and column.type|lower in ['text', 'varchar', 'string'] %}
+          {% set text_column = column.name %}
+        {% endif %}
+        {% if not numeric_column and column.type|lower in ['integer', 'int', 'number', 'real', 'numeric'] %}
+          {% set numeric_column = column.name %}
+        {% endif %}
+      {% endfor %}
+
+      {% if date_column %}
+      <div class="example-card">
+        <h4>📅 Recent Records</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Get most recent records
+SELECT *
+FROM "{{ table }}"
+ORDER BY "{{ date_column }}" DESC
+LIMIT 15;</code></pre>
+        </div>
+        <p><em>See the newest data in this table</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+ORDER+BY+%22{{ date_column }}%22+DESC+LIMIT+15" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if text_column %}
+      <div class="example-card">
+        <h4>🔍 Text Search</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Search for specific terms
+SELECT *
+FROM "{{ table }}"
+WHERE LOWER("{{ text_column }}") LIKE '%search_term%'
+LIMIT 20;</code></pre>
+        </div>
+        <p><em>Find records containing specific text</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+LOWER(%22{{ text_column }}%22)+LIKE+%27%25search%25%27+LIMIT+20" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if date_column %}
+      <div class="example-card">
+        <h4>📊 Records by Time Period</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Group records by month
+SELECT
+  strftime('%Y-%m', "{{ date_column }}") as month,
+  COUNT(*) as record_count
+FROM "{{ table }}"
+WHERE "{{ date_column }}" IS NOT NULL
+GROUP BY month
+ORDER BY month DESC
+LIMIT 12;</code></pre>
+        </div>
+        <p><em>See data distribution over time</em></p>
+        <a href="/{{ database }}?sql=SELECT+strftime(%27%25Y-%25m%27%2C+%22{{ date_column }}%22)+as+month%2C+COUNT(*)+as+record_count+FROM+%22{{ table }}%22+WHERE+%22{{ date_column }}%22+IS+NOT+NULL+GROUP+BY+month+ORDER+BY+month+DESC+LIMIT+12" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if numeric_column %}
+      <div class="example-card">
+        <h4>📈 Numeric Analysis</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Basic statistics
+SELECT
+  COUNT(*) as total_records,
+  MIN("{{ numeric_column }}") as min_value,
+  MAX("{{ numeric_column }}") as max_value,
+  AVG("{{ numeric_column }}") as avg_value
+FROM "{{ table }}"
+WHERE "{{ numeric_column }}" IS NOT NULL;</code></pre>
+        </div>
+        <p><em>Statistical summary of numeric data</em></p>
+        <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_records%2C+MIN(%22{{ numeric_column }}%22)+as+min_value%2C+MAX(%22{{ numeric_column }}%22)+as+max_value%2C+AVG(%22{{ numeric_column }}%22)+as+avg_value+FROM+%22{{ table }}%22+WHERE+%22{{ numeric_column }}%22+IS+NOT+NULL" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <div class="example-card">
+        <h4>🔧 Custom Query Template</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Customize this query
+SELECT
+  -- Choose your columns
+  *
+FROM "{{ table }}"
+WHERE
+  -- Add your conditions
+  1=1
+{% if date_column %}ORDER BY "{{ date_column }}" DESC{% endif %}
+LIMIT 50;</code></pre>
+        </div>
+        <p><em>Starting point for your own queries</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22{% if date_column %}+ORDER+BY+%22{{ date_column }}%22+DESC{% endif %}+LIMIT+50" class="try-button">🔗 Try This Query</a>
+      </div>
+    </div>
+
+    <div class="tip-box">
+      <h4>💡 Query Tips for {{ table|title }}</h4>
+      <ul>
+        <li><strong>Column names:</strong> Use double quotes for safety: <code>"{{ table }}"</code></li>
+        <li><strong>Text search:</strong> Use <code>LIKE '%keyword%'</code> for partial matches</li>
+        <li><strong>Case-insensitive:</strong> Use <code>LOWER(column)</code> for text comparisons</li>
+        <li><strong>Sort results:</strong> Add <code>ORDER BY column_name DESC</code></li>
+        <li><strong>Limit output:</strong> Always use <code>LIMIT</code> for large tables</li>
+      </ul>
     </div>
   </div>
 </section>

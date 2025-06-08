@@ -2858,722 +2858,466 @@ if __name__ == "__main__":
 
 {% block content %}
 <div class="database-header">
-  <!-- Breadcrumbs stay outside the card -->
-  <div class="breadcrumbs">
-    <a href="/">🏠 Home</a>
-    <span class="separator">→</span>
-    <span>{{ database|title }}</span>
-  </div>
-
-  <!-- Database overview card -->
-  <div class="database-overview">
-    <div class="database-info">
-
-      <!-- Left side: Title, description, stats -->
-      <div class="database-summary">
-        <h1 class="database-title">{{ database|title }}</h1>
-
-        {% if database_description %}
-        <p class="database-subtitle">{{ database_description }}</p>
-        {% else %}
-        <p class="database-subtitle">
-          Searchable Singapore legal data
-        </p>
-        {% endif %}
-
-        <!-- Database Statistics -->
-        <div class="database-stats">
-          {% if tables %}
-          <div class="stat-item">
-            <span class="stat-number">{{ tables|length }}</span>
-            <span class="stat-label">table{{ tables|length|pluralize }}</span>
-          </div>
-          {% endif %}
-
-          {% if tables %}
-          {% set total_rows = tables|sum(attribute='count')|default(0) %}
-          {% if total_rows > 0 %}
-          <div class="stat-item">
-            <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
-            <span class="stat-label">total rows</span>
-          </div>
-          {% endif %}
-          {% endif %}
-
-          {% if database_size is defined and database_size %}
-          <div class="stat-item">
-            <span class="stat-number">{{ database_size|filesizeformat }}</span>
-            <span class="stat-label">size</span>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-
-      <!-- Right side: Actions -->
-      <div class="database-actions-section">
-        <div class="export-actions">
-          <a href="/{{ database }}.json" class="btn btn-secondary">📊 JSON</a>
-          <a href="/{{ database }}.csv" class="btn btn-secondary">📈 CSV</a>
-          <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27" class="btn btn-secondary">🔍 Schema</a>
-        </div>
-      </div>
+    <!-- Breadcrumbs stay outside the card -->
+    <div class="breadcrumbs">
+        <a href="/">🏠 Home</a>
+        <span class="separator">→</span>
+        <span>{{ database|title }}</span>
     </div>
-  </div>
+
+    <!-- Database overview card -->
+    <div class="database-overview">
+        <div class="database-info">
+
+            <!-- Left side: Title, description, stats -->
+            <div class="database-summary">
+                <h1 class="database-title">{{ database|title }}</h1>
+
+                {% if database_description %}
+                <p class="database-subtitle">{{ database_description }}</p>
+                {% else %}
+                <p class="database-subtitle">
+                    Searchable Singapore legal data
+                </p>
+                {% endif %}
+
+                <!-- Database Statistics -->
+                <div class="database-stats">
+                    {% if tables %}
+                    <div class="stat-item">
+                        <span class="stat-number">{{ tables|length }}</span>
+                        <span class="stat-label">table{% if tables|length != 1 %}s{% endif %}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if tables %}
+                    {% set total_rows = 0 %}
+                    {% for table in tables %}
+                    {% if table.count %}
+                    {% set total_rows = total_rows + table.count %}
+                    {% endif %}
+                    {% endfor %}
+                    {% if total_rows > 0 %}
+                    <div class="stat-item">
+                        <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
+                        <span class="stat-label">total rows</span>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if database_size is defined and database_size %}
+                    <div class="stat-item">
+                        <span class="stat-number">{{ database_size|filesizeformat }}</span>
+                        <span class="stat-label">size</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right side: Actions -->
+            <div class="database-actions-section">
+                <div class="export-actions">
+                    <a href="/{{ database }}.json" class="btn btn-secondary">📊 JSON</a>
+                    <a href="/{{ database }}.csv" class="btn btn-secondary">📈 CSV</a>
+                    <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27"
+                       class="btn btn-secondary">🔍 Schema</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {% if search_query %}
 <div class="card">
-  <div class="card-header">
-    <h2 class="card-title">Search Results for "{{ search_query }}"</h2>
-    <p class="card-description">
-      {% if search_results %}
-      Found {{ search_results|length }} matching table{{ search_results|length|pluralize }}
-      {% else %}
-      No tables found matching your search.
-      {% endif %}
-    </p>
-  </div>
+    <div class="card-header">
+        <h2 class="card-title">Search Results for "{{ search_query }}"</h2>
+        <p class="card-description">
+            {% if search_results %}
+            Found {{ search_results|length }} matching table{% if search_results|length != 1 %}s{% endif %}
+            {% else %}
+            No tables found matching your search.
+            {% endif %}
+        </p>
+    </div>
 </div>
 {% endif %}
 
 {% if tables %}
 <section class="tables-section">
-  {% if not search_query %}
-  <h2>Tables</h2>
-  {% endif %}
+    {% if not search_query %}
+    <h2>Tables</h2>
+    {% endif %}
 
-  <div class="tables-grid">
-    {% for table in tables %}
-    <div class="card table-card">
-      <div class="table-header">
-        <h3>
-          <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
-        </h3>
+    <div class="tables-grid">
+        {% for table in tables %}
+        <div class="card table-card">
+            <div class="table-header">
+                <h3>
+                    <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
+                </h3>
 
-        <div class="table-badges">
-          {% if table.count is defined and table.count is not none %}
-          <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
-          {% endif %}
+                <div class="table-badges">
+                    {% if table.count is defined and table.count is not none %}
+                    <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
+                    {% endif %}
 
-          {% if table.columns %}
-          <span class="badge badge-columns">{{ table.columns|length }} columns</span>
-          {% endif %}
+                    {% if table.columns %}
+                    <span class="badge badge-columns">{{ table.columns|length }} columns</span>
+                    {% endif %}
 
-          {% if table.fts %}
-          <span class="badge badge-fts">🔍 Searchable</span>
-          {% endif %}
+                    {% if table.fts %}
+                    <span class="badge badge-fts">🔍 Searchable</span>
+                    {% endif %}
 
-          {% if table.has_primary_key %}
-          <span class="badge badge-pk">🔑 Primary Key</span>
-          {% endif %}
-        </div>
-      </div>
+                    {% if table.has_primary_key %}
+                    <span class="badge badge-pk">🔑 Primary Key</span>
+                    {% endif %}
+                </div>
+            </div>
 
-      {% if table.description %}
-      <p class="table-description">{{ table.description }}</p>
-      {% endif %}
-
-      {% if table.columns %}
-      <div class="table-schema">
-        <h4>Key Columns:</h4>
-        <div class="column-list">
-          {% for column in table.columns[:5] %}
-          <div class="column-item">
-            <span class="column-name">{{ column.name }}</span>
-            <span class="column-type">{{ column.type }}</span>
-            {% if column.is_pk %}
-            <span class="column-flag">PK</span>
+            {% if table.description %}
+            <p class="table-description">{{ table.description }}</p>
             {% endif %}
-            {% if column.notnull %}
-            <span class="column-flag">NOT NULL</span>
+
+            {% if table.columns %}
+            <div class="table-schema">
+                <h4>Key Columns:</h4>
+                <div class="column-list">
+                    {% for column in table.columns[:5] %}
+                    <div class="column-item">
+                        <span class="column-name">{{ column.name }}</span>
+                        <span class="column-type">{{ column.type }}</span>
+                        {% if column.is_pk %}
+                        <span class="column-flag">PK</span>
+                        {% endif %}
+                        {% if column.notnull %}
+                        <span class="column-flag">NOT NULL</span>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if table.columns|length > 5 %}
+                    <div class="column-item more-columns">
+                        <em>...and {{ table.columns|length - 5 }} more column{% if (table.columns|length - 5) != 1 %}s{%
+                            endif %}</em>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
             {% endif %}
-          </div>
-          {% endfor %}
-          {% if table.columns|length > 5 %}
-          <div class="column-item more-columns">
-            <em>...and {{ table.columns|length - 5 }} more column{{ (table.columns|length - 5)|pluralize }}</em>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
 
-      {% if table.sample_rows %}
-      <div class="table-preview">
-        <h4>Sample Data:</h4>
-        <div class="preview-table">
-          <table>
-            <thead>
-              <tr>
-                {% for column in table.columns[:3] %}
-                <th>{{ column.name }}</th>
-                {% endfor %}
-                {% if table.columns|length > 3 %}
-                <th>...</th>
-                {% endif %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in table.sample_rows[:2] %}
-              <tr>
-                {% for cell in row[:3] %}
-                <td>{{ cell|truncate(30) }}</td>
-                {% endfor %}
-                {% if table.columns|length > 3 %}
-                <td>...</td>
-                {% endif %}
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {% endif %}
+            {% if table.sample_rows %}
+            <div class="table-preview">
+                <h4>Sample Data:</h4>
+                <div class="preview-table">
+                    <table>
+                        <thead>
+                        <tr>
+                            {% for column in table.columns[:3] %}
+                            <th>{{ column.name }}</th>
+                            {% endfor %}
+                            {% if table.columns|length > 3 %}
+                            <th>...</th>
+                            {% endif %}
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in table.sample_rows[:2] %}
+                        <tr>
+                            {% for cell in row[:3] %}
+                            <td>{{ cell|truncate(30) }}</td>
+                            {% endfor %}
+                            {% if table.columns|length > 3 %}
+                            <td>...</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
 
-      <div class="table-actions">
-        <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore</a>
-        <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
-        <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
-        {% if table.fts %}
-        <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
-        {% endif %}
-      </div>
+            <div class="table-actions">
+                <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore</a>
+                <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
+                <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
+                {% if table.fts %}
+                <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-  </div>
 </section>
 {% else %}
 <section class="no-tables">
-  <div class="card">
-    <h2>No Tables Available</h2>
-    {% if search_query %}
-    <p>No tables found matching "{{ search_query }}". Try a different search term or <a href="/{{ database }}">view all tables</a>.</p>
-    {% else %}
-    <p>This database doesn't contain any tables yet. Data is synchronized regularly.</p>
-    {% endif %}
-  </div>
+    <div class="card">
+        <h2>No Tables Available</h2>
+        {% if search_query %}
+        <p>No tables found matching "{{ search_query }}". Try a different search term or <a href="/{{ database }}">view
+            all tables</a>.</p>
+        {% else %}
+        <p>This database doesn't contain any tables yet. Data is synchronized regularly.</p>
+        {% endif %}
+    </div>
 </section>
 {% endif %}
 
 {% if views %}
 <section class="views-section">
-  <h2>Views</h2>
-  <div class="views-grid">
-    {% for view in views %}
-    <div class="card view-card">
-      <h3>
-        <a href="/{{ database }}/{{ view.name }}">{{ view.name|title }}</a>
-      </h3>
+    <h2>Views</h2>
+    <div class="views-grid">
+        {% for view in views %}
+        <div class="card view-card">
+            <h3>
+                <a href="/{{ database }}/{{ view.name }}">{{ view.name|title }}</a>
+            </h3>
 
-      {% if view.description %}
-      <p class="view-description">{{ view.description }}</p>
-      {% endif %}
+            {% if view.description %}
+            <p class="view-description">{{ view.description }}</p>
+            {% endif %}
 
-      <div class="view-actions">
-        <a href="/{{ database }}/{{ view.name }}" class="btn btn-primary">Query</a>
-        <a href="/{{ database }}/{{ view.name }}.json" class="btn">JSON</a>
-      </div>
+            <div class="view-actions">
+                <a href="/{{ database }}/{{ view.name }}" class="btn btn-primary">Query</a>
+                <a href="/{{ database }}/{{ view.name }}.json" class="btn">JSON</a>
+            </div>
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-  </div>
 </section>
 {% endif %}
 
 <!-- Enhanced SQL Examples Section -->
 <section class="sql-examples-section">
-  <div class="card">
-    <h2>💻 SQL Examples for {{ database|title }}</h2>
-    <p>Get started with these ready-to-use queries for exploring {{ database }} data:</p>
+    <div class="card">
+        <h2>💻 SQL Examples for {{ database|title }}</h2>
+        <p>Get started with these ready-to-use queries for exploring {{ database }} data:</p>
 
-    <div class="examples-grid">
-      {% if tables %}
-      <!-- Basic exploration examples -->
-      <div class="example-card">
-        <h4>📊 Overview of All Tables</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- See all tables and their structure
+        <div class="examples-grid">
+            {% if tables %}
+            <!-- Basic exploration examples -->
+            <div class="example-card">
+                <h4>📊 Overview of All Tables</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- See all tables and their structure
 SELECT name, sql
 FROM sqlite_master
 WHERE type = 'table'
 ORDER BY name;</code></pre>
-        </div>
-        <p><em>Explore the complete database schema</em></p>
-        <a href="/{{ database }}?sql=SELECT+name%2C+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name" class="try-button">🔗 Try This Query</a>
-      </div>
+                </div>
+                <p><em>Explore the complete database schema</em></p>
+                <a href="/{{ database }}?sql=SELECT+name%2C+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
 
-      {% set first_table = tables[0] %}
-      <div class="example-card">
-        <h4>🔍 Sample Data from {{ first_table.name|title }}</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- Get a sample of {{ first_table.name }} data
+            {% set first_table = tables[0] %}
+            <div class="example-card">
+                <h4>🔍 Sample Data from {{ first_table.name|title }}</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Get a sample of {{ first_table.name }} data
 SELECT *
 FROM "{{ first_table.name }}"
 LIMIT 10;</code></pre>
-        </div>
-        <p><em>Quick preview of {{ first_table.name }} table contents</em></p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22+LIMIT+10" class="try-button">🔗 Try This Query</a>
-      </div>
+                </div>
+                <p><em>Quick preview of {{ first_table.name }} table contents</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22+LIMIT+10" class="try-button">🔗
+                    Try This Query</a>
+            </div>
 
-      {% if first_table.count and first_table.count > 0 %}
-      <div class="example-card">
-        <h4>📈 Record Counts by Table</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- Count records in each table
+            {% if first_table.count and first_table.count > 0 %}
+            <div class="example-card">
+                <h4>📈 Record Counts by Table</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Count records in each table
 {% for table in tables[:3] %}SELECT '{{ table.name }}' as table_name, COUNT(*) as record_count FROM "{{ table.name }}"{% if not loop.last %}
 UNION ALL
 {% endif %}{% endfor %}{% if tables|length > 3 %}
 -- Add more tables as needed{% endif %}
 ORDER BY record_count DESC;</code></pre>
-        </div>
-        <p><em>Compare data volume across tables</em></p>
-        <a href="/{{ database }}?sql={% for table in tables[:3] %}SELECT+%27{{ table.name }}%27+as+table_name%2C+COUNT%28*%29+as+record_count+FROM+%22{{ table.name }}%22{% if not loop.last %}+UNION+ALL+{% endif %}{% endfor %}+ORDER+BY+record_count+DESC" class="try-button">🔗 Try This Query</a>
-      </div>
-      {% endif %}
+                </div>
+                <p><em>Compare data volume across tables</em></p>
+                {% set union_query = [] %}
+                {% for table in tables[:3] %}
+                {% set query_part = "SELECT+%27" + table.name +
+                "%27+as+table_name%2C+COUNT%28*%29+as+record_count+FROM+%22" + table.name + "%22" %}
+                {% if union_query.append(query_part) %}{% endif %}
+                {% endfor %}
+                <a href="/{{ database }}?sql={{ union_query|join('+UNION+ALL+') }}+ORDER+BY+record_count+DESC"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+            {% endif %}
 
-      <!-- Legal-specific examples if this looks like legal data -->
-      {% if database|lower in ['sglawwatch', 'legal', 'court', 'law'] %}
-      <div class="example-card">
-        <h4>📅 Recent Legal Updates</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- Find recent legal developments
-SELECT {{ first_table.columns[0].name if first_table.columns else '*' }}{% if first_table.columns|length > 1 %}, {{ first_table.columns[1].name }}{% endif %}
+            <!-- Legal-specific examples if this looks like legal data -->
+            {% if database|lower in ['sglawwatch', 'legal', 'court', 'law'] %}
+            {% set date_column = '' %}
+            {% set text_column = '' %}
+            {% for column in first_table.columns %}
+            {% if not date_column and column.name|lower in ['date', 'created_at', 'updated_at', 'published'] %}
+            {% set date_column = column.name %}
+            {% endif %}
+            {% if not text_column and column.type|lower in ['text', 'varchar'] %}
+            {% set text_column = column.name %}
+            {% endif %}
+            {% endfor %}
+
+            <div class="example-card">
+                <h4>📅 Recent Legal Updates</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Find recent legal developments
+SELECT {% if first_table.columns %}{{ first_table.columns[0].name }}{% if first_table.columns|length > 1 %}, {{ first_table.columns[1].name }}{% endif %}{% else %}*{% endif %}
 FROM "{{ first_table.name }}"
-WHERE {% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'updated_at', 'published'] %}{{ column.name }} >= date('now', '-30 days'){% break %}{% endfor %}
-ORDER BY {% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'updated_at', 'published'] %}{{ column.name }}{% break %}{% endfor %} DESC
+{% if date_column %}WHERE {{ date_column }} >= date('now', '-30 days')
+ORDER BY {{ date_column }} DESC{% else %}ORDER BY 1{% endif %}
 LIMIT 20;</code></pre>
-        </div>
-        <p><em>See what's new in the last 30 days</em></p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22+ORDER+BY+{% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'updated_at', 'published'] %}{{ column.name }}{% break %}{% endfor %}+DESC+LIMIT+20" class="try-button">🔗 Try This Query</a>
-      </div>
+                </div>
+                <p><em>See what's new in the last 30 days</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22{% if date_column %}+ORDER+BY+{{ date_column }}{% endif %}+DESC+LIMIT+20"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
 
-      <div class="example-card">
-        <h4>🔍 Text Search Example</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- Search for contract-related content
+            <div class="example-card">
+                <h4>🔍 Text Search Example</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Search for contract-related content
 SELECT {% for column in first_table.columns[:2] %}{{ column.name }}{% if not loop.last %}, {% endif %}{% endfor %}
 FROM "{{ first_table.name }}"
-WHERE {% for column in first_table.columns if column.type|lower in ['text', 'varchar'] %}LOWER({{ column.name }}) LIKE '%contract%'{% break %}{% endfor %}
-ORDER BY {% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'updated_at', 'published'] %}{{ column.name }}{% break %}{% endfor %} DESC
+{% if text_column %}WHERE LOWER({{ text_column }}) LIKE '%contract%'{% endif %}
+{% if date_column %}ORDER BY {{ date_column }} DESC{% else %}ORDER BY 1{% endif %}
 LIMIT 15;</code></pre>
-        </div>
-        <p><em>Find content containing specific legal terms</em></p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22+WHERE+{% for column in first_table.columns if column.type|lower in ['text', 'varchar'] %}LOWER%28{{ column.name }}%29+LIKE+%27%25contract%25%27{% break %}{% endfor %}+LIMIT+15" class="try-button">🔗 Try This Query</a>
-      </div>
-      {% endif %}
+                </div>
+                <p><em>Find content containing specific legal terms</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22{% if text_column %}+WHERE+LOWER%28{{ text_column }}%29+LIKE+%27%25contract%25%27{% endif %}+LIMIT+15"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
+            {% endif %}
 
-      <!-- Generic useful examples -->
-      <div class="example-card">
-        <h4>🎯 Custom Filter Example</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- Filter and sort your way
+            <!-- Generic useful examples -->
+            {% set sort_column = '' %}
+            {% set filter_column = '' %}
+            {% for column in first_table.columns %}
+            {% if not sort_column and column.name|lower in ['date', 'created_at', 'updated_at', 'id'] %}
+            {% set sort_column = column.name %}
+            {% endif %}
+            {% if not filter_column and column.type|lower in ['text', 'varchar'] %}
+            {% set filter_column = column.name %}
+            {% endif %}
+            {% endfor %}
+
+            <div class="example-card">
+                <h4>🎯 Custom Filter Example</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Filter and sort your way
 SELECT *
 FROM "{{ first_table.name }}"
-WHERE {% for column in first_table.columns if column.type|lower in ['text', 'varchar'] %}{{ column.name }} IS NOT NULL{% break %}{% endfor %}
-ORDER BY {% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'updated_at', 'id'] %}{{ column.name }}{% break %}{% endfor %} DESC
+{% if filter_column %}WHERE {{ filter_column }} IS NOT NULL{% endif %}
+{% if sort_column %}ORDER BY {{ sort_column }} DESC{% else %}ORDER BY 1{% endif %}
 LIMIT 25;</code></pre>
-        </div>
-        <p><em>Template for building your own filters</em></p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22+ORDER+BY+{% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'updated_at', 'id'] %}{{ column.name }}{% break %}{% endfor %}+DESC+LIMIT+25" class="try-button">🔗 Try This Query</a>
-      </div>
+                </div>
+                <p><em>Template for building your own filters</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name }}%22{% if sort_column %}+ORDER+BY+{{ sort_column }}{% endif %}+DESC+LIMIT+25"
+                   class="try-button">🔗 Try This Query</a>
+            </div>
 
-      {% endif %}
+            {% endif %}
 
-      <!-- Universal examples -->
-      <div class="example-card">
-        <h4>🔧 Build Your Own Query</h4>
-        <div class="example-box">
-          <button class="copy-btn" onclick="copyCode(this)">📋</button>
-          <pre><code>-- Start with this template
+            <!-- Universal examples -->
+            <div class="example-card">
+                <h4>🔧 Build Your Own Query</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>-- Start with this template
 SELECT
     -- Choose your columns
     *
 FROM
-    "{{ first_table.name if tables else 'table_name' }}"
+    "{% if tables %}{{ first_table.name }}{% else %}table_name{% endif %}"
 WHERE
     -- Add your conditions
     1=1
 ORDER BY
     -- Sort your results
-    {% for column in first_table.columns if column.name|lower in ['date', 'created_at', 'id'] %}{{ column.name }}{% break %}{% else %}1{% endfor %} DESC
+    {% if sort_column %}{{ sort_column }}{% else %}1{% endif %} DESC
 LIMIT 50;</code></pre>
+                </div>
+                <p><em>Customize this template for your specific needs</em></p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+%22{% if tables %}{{ first_table.name }}{% else %}table_name{% endif %}%22+LIMIT+50"
+                   class="try-button">🔗 Try SQL Editor</a>
+            </div>
         </div>
-        <p><em>Customize this template for your specific needs</em></p>
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ first_table.name if tables else 'table_name' }}%22+LIMIT+50" class="try-button">🔗 Try SQL Editor</a>
-      </div>
-    </div>
 
-    <div class="tip-box">
-      <h4>💡 SQL Tips for {{ database|title }}</h4>
-      <ul>
-        <li><strong>Table names with spaces:</strong> Use double quotes like <code>"table name"</code></li>
-        <li><strong>Text search:</strong> Use <code>LIKE '%keyword%'</code> for partial matches</li>
-        <li><strong>Date filtering:</strong> Use <code>date >= '2024-01-01'</code> format</li>
-        <li><strong>Sorting:</strong> Add <code>ORDER BY column_name DESC</code> for newest first</li>
-        <li><strong>Limit results:</strong> Always add <code>LIMIT 100</code> to avoid huge results</li>
-      </ul>
+        <div class="tip-box">
+            <h4>💡 SQL Tips for {{ database|title }}</h4>
+            <ul>
+                <li><strong>Table names with spaces:</strong> Use double quotes like <code>"table name"</code></li>
+                <li><strong>Text search:</strong> Use <code>LIKE '%keyword%'</code> for partial matches</li>
+                <li><strong>Date filtering:</strong> Use <code>date >= '2024-01-01'</code> format</li>
+                <li><strong>Sorting:</strong> Add <code>ORDER BY column_name DESC</code> for newest first</li>
+                <li><strong>Limit results:</strong> Always add <code>LIMIT 100</code> to avoid huge results</li>
+            </ul>
+        </div>
     </div>
-  </div>
 </section>
 
 <section class="database-tools">
-  <div class="card">
-    <h2>🛠️ Database Tools</h2>
+    <div class="card">
+        <h2>🛠️ Database Tools</h2>
 
-    <div class="tools-grid">
-      <div class="tool">
-        <h3>💻 SQL Query</h3>
-        <p>Write custom SQL queries against this database</p>
-        <a href="/{{ database }}?sql=" class="btn">SQL Editor</a>
-      </div>
+        <div class="tools-grid">
+            <div class="tool">
+                <h3>💻 SQL Query</h3>
+                <p>Write custom SQL queries against this database</p>
+                <a href="/{{ database }}?sql=SELECT+*+FROM+sqlite_master+LIMIT+25" class="btn">SQL Editor</a>
+            </div>
 
-      <div class="tool">
-        <h3>📊 Schema</h3>
-        <p>Explore database structure and relationships</p>
-        <a href="/{{ database }}?sql=SELECT+name,+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name" class="btn">View Schema</a>
-      </div>
+            <div class="tool">
+                <h3>📊 Schema</h3>
+                <p>Explore database structure and relationships</p>
+                <a href="/{{ database }}?sql=SELECT+name,+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name"
+                   class="btn">View Schema</a>
+            </div>
 
-      <div class="tool">
-        <h3>📈 Export All</h3>
-        <p>Download the entire database</p>
-        <div class="export-options">
-          <a href="/{{ database }}.json" class="btn">JSON</a>
-          <a href="/{{ database }}.csv" class="btn">CSV</a>
-          <a href="/{{ database }}.db" class="btn">SQLite</a>
+            <div class="tool">
+                <h3>📈 Export All</h3>
+                <p>Download the entire database</p>
+                <div class="export-options">
+                    <a href="/{{ database }}.json" class="btn">JSON</a>
+                    <a href="/{{ database }}.csv" class="btn">CSV</a>
+                    <a href="/{{ database }}.db" class="btn">SQLite</a>
+                </div>
+            </div>
         </div>
-      </div>
-
-      <div class="tool">
-        <h3>🔍 Search</h3>
-        <p>Search across all tables in this database</p>
-        <a href="/-/search?database={{ database }}" class="btn">Search All</a>
-      </div>
     </div>
-  </div>
 </section>
 
 {% if canned_queries %}
 <section class="canned-queries">
-  <div class="card">
-    <h2>📋 Example Queries</h2>
-    <p>Common queries to get you started</p>
+    <div class="card">
+        <h2>📋 Example Queries</h2>
+        <p>Common queries to get you started</p>
 
-    <div class="queries-grid">
-      {% for query in canned_queries %}
-      <div class="query-card">
-        <h3>{{ query.title }}</h3>
-        {% if query.description %}
-        <p class="query-description">{{ query.description }}</p>
-        {% endif %}
-        <div class="query-actions">
-          <a href="/{{ database }}?{{ query.name }}" class="btn btn-primary">Run</a>
-          <a href="/{{ database }}?{{ query.name }}&_format=json" class="btn">JSON</a>
+        <div class="queries-grid">
+            {% for query in canned_queries %}
+            <div class="query-card">
+                <h3>{{ query.title }}</h3>
+                {% if query.description %}
+                <p class="query-description">{{ query.description }}</p>
+                {% endif %}
+                <div class="query-actions">
+                    <a href="/{{ database }}?{{ query.name }}" class="btn btn-primary">Run</a>
+                    <a href="/{{ database }}?{{ query.name }}&_format=json" class="btn">JSON</a>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-      </div>
-      {% endfor %}
     </div>
-  </div>
 </section>
 {% endif %}
-
-<style>
-/* Additional styles for the enhanced database page */
-.example-box {
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-    margin: var(--space-md) 0;
-    position: relative;
-}
-
-.example-box pre {
-    margin: 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: var(--text-sm);
-    line-height: 1.5;
-    color: var(--color-text-secondary);
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-
-.example-box code {
-    color: var(--color-accent-cyan);
-}
-
-.copy-btn {
-    position: absolute;
-    top: var(--space-sm);
-    right: var(--space-sm);
-    background: var(--color-accent-primary);
-    color: white;
-    border: none;
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-xs);
-    cursor: pointer;
-    transition: var(--transition-fast);
-}
-
-.copy-btn:hover {
-    background: var(--color-accent-hover);
-}
-
-.try-button {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
-    background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
-    color: white;
-    text-decoration: none;
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
-    font-weight: 500;
-    transition: var(--transition-fast);
-    margin-top: var(--space-sm);
-}
-
-.try-button:hover {
-    transform: translateY(-1px);
-    color: white;
-    text-decoration: none;
-}
-
-.tip-box {
-    background: rgba(0, 212, 255, 0.1);
-    border: 1px solid var(--color-accent-cyan);
-    border-radius: var(--radius-md);
-    padding: var(--space-md);
-    margin: var(--space-lg) 0;
-}
-
-.tip-box h4 {
-    color: var(--color-accent-cyan);
-    margin: 0 0 var(--space-sm) 0;
-    font-size: var(--text-sm);
-}
-
-.tip-box ul {
-    margin: 0;
-    padding-left: var(--space-lg);
-}
-
-.tip-box li {
-    color: var(--color-text-secondary);
-    margin-bottom: var(--space-xs);
-}
-
-.tip-box code {
-    background: var(--color-bg-tertiary);
-    color: var(--color-accent-cyan);
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: var(--text-xs);
-}
-
-/* Table-specific styles */
-.tables-grid {
-    display: grid;
-    gap: var(--space-xl);
-    margin-top: var(--space-xl);
-    grid-template-columns: 1fr;
-}
-
-@media (min-width: 768px) {
-    .tables-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 1200px) {
-    .tables-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-.table-card {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-.table-header {
-    margin-bottom: var(--space-md);
-}
-
-.table-badges {
-    display: flex;
-    gap: var(--space-xs);
-    margin-top: var(--space-sm);
-    flex-wrap: wrap;
-}
-
-.badge {
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--radius-sm);
-    font-size: var(--text-xs);
-    font-weight: 500;
-}
-
-.badge-rows {
-    background: rgba(0, 212, 255, 0.2);
-    color: var(--color-accent-cyan);
-}
-
-.badge-columns {
-    background: rgba(255, 0, 110, 0.2);
-    color: var(--color-accent-magenta);
-}
-
-.badge-fts {
-    background: rgba(16, 185, 129, 0.2);
-    color: #10B981;
-}
-
-.badge-pk {
-    background: rgba(251, 191, 36, 0.2);
-    color: #FBBF24;
-}
-
-.table-schema {
-    margin: var(--space-md) 0;
-    flex-grow: 1;
-}
-
-.table-schema h4 {
-    font-size: var(--text-sm);
-    color: var(--color-text-primary);
-    margin: 0 0 var(--space-sm) 0;
-}
-
-.column-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-}
-
-.column-item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-xs) 0;
-    font-size: var(--text-xs);
-}
-
-.column-name {
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--color-accent-cyan);
-    font-weight: 500;
-}
-
-.column-type {
-    color: var(--color-text-muted);
-    font-size: var(--text-xs);
-}
-
-.column-flag {
-    background: var(--color-bg-tertiary);
-    color: var(--color-text-muted);
-    padding: 1px var(--space-xs);
-    border-radius: var(--radius-sm);
-    font-size: 10px;
-    font-weight: 600;
-}
-
-.more-columns {
-    font-style: italic;
-    color: var(--color-text-muted);
-}
-
-.table-preview {
-    margin: var(--space-md) 0;
-}
-
-.table-preview h4 {
-    font-size: var(--text-sm);
-    color: var(--color-text-primary);
-    margin: 0 0 var(--space-sm) 0;
-}
-
-.preview-table {
-    overflow-x: auto;
-}
-
-.preview-table table {
-    width: 100%;
-    font-size: var(--text-xs);
-    border-collapse: collapse;
-}
-
-.preview-table th,
-.preview-table td {
-    padding: var(--space-xs) var(--space-sm);
-    border: 1px solid var(--color-border);
-    text-align: left;
-}
-
-.preview-table th {
-    background: var(--color-bg-tertiary);
-    color: var(--color-text-primary);
-    font-weight: 600;
-}
-
-.preview-table td {
-    color: var(--color-text-muted);
-}
-
-.table-actions {
-    display: flex;
-    gap: var(--space-xs);
-    margin-top: auto;
-    padding-top: var(--space-md);
-    flex-wrap: wrap;
-}
-
-.table-actions .btn {
-    font-size: var(--text-xs);
-    padding: var(--space-xs) var(--space-sm);
-    min-height: 32px;
-}
-</style>
-
-<script>
-function copyCode(button) {
-    const codeBlock = button.nextElementSibling.querySelector('code') || button.nextElementSibling;
-    const text = codeBlock.textContent;
-
-    navigator.clipboard.writeText(text).then(() => {
-        const originalText = button.textContent;
-        button.textContent = '✅ Copied!';
-        button.style.background = '#10B981';
-
-        setTimeout(() => {
-            button.textContent = originalText;
-            button.style.background = '';
-        }, 2000);
-    }).catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-
-        button.textContent = '✅ Copied!';
-        setTimeout(() => {
-            button.textContent = '📋';
-        }, 2000);
-    });
-}
-</script>
 {% endblock %}
 </document_content>
 </document>
@@ -3584,10 +3328,12 @@ function copyCode(button) {
 
 {% block extra_head %}
 {{ super() }}
-<meta name="description" content="Explore Singapore legal data through search and SQL queries. Legal news database with court cases coming soon.">
+<meta name="description"
+      content="Explore Singapore legal data through search and SQL queries. Legal news database with court cases coming soon.">
 <meta name="keywords" content="Singapore law, legal data, court decisions, legal research">
 <meta property="og:title" content="data.zeeker.sg - Explore Singapore Legal Data">
-<meta property="og:description" content="Search and query Singapore legal data - legal news database with court cases coming soon">
+<meta property="og:description"
+      content="Search and query Singapore legal data - legal news database with court cases coming soon">
 <meta property="og:type" content="website">
 
 <!-- Preload critical hero image -->
@@ -3605,32 +3351,32 @@ function copyCode(button) {
         <picture class="hero-background-picture">
             <!-- WebP versions for modern browsers -->
             <source
-                media="(max-width: 768px)"
-                srcset="/static/images/supcourt-sg-mobile.webp"
-                type="image/webp">
+                    media="(max-width: 768px)"
+                    srcset="/static/images/supcourt-sg-mobile.webp"
+                    type="image/webp">
             <source
-                media="(max-width: 1024px)"
-                srcset="/static/images/supcourt-sg-tablet.webp"
-                type="image/webp">
+                    media="(max-width: 1024px)"
+                    srcset="/static/images/supcourt-sg-tablet.webp"
+                    type="image/webp">
             <source
-                media="(min-width: 1025px)"
-                srcset="/static/images/supcourt-sg.webp"
-                type="image/webp">
+                    media="(min-width: 1025px)"
+                    srcset="/static/images/supcourt-sg.webp"
+                    type="image/webp">
 
             <!-- PNG fallbacks -->
             <source
-                media="(max-width: 768px)"
-                srcset="/static/images/supcourt-sg-mobile.png">
+                    media="(max-width: 768px)"
+                    srcset="/static/images/supcourt-sg-mobile.png">
             <source
-                media="(max-width: 1024px)"
-                srcset="/static/images/supcourt-sg-tablet.png">
+                    media="(max-width: 1024px)"
+                    srcset="/static/images/supcourt-sg-tablet.png">
 
             <!-- Default fallback -->
             <img
-                src="/static/images/supcourt-sg.png"
-                alt="Singapore Supreme Court"
-                class="hero-background-image loading"
-                loading="eager">
+                    src="/static/images/supcourt-sg.png"
+                    alt="Singapore Supreme Court"
+                    class="hero-background-image loading"
+                    loading="eager">
         </picture>
         <div class="hero-overlay-gradient"></div>
     </div>
@@ -3646,11 +3392,11 @@ function copyCode(button) {
                 <form class="hero-search-form" action="/-/search">
                     <div class="hero-search-wrapper">
                         <input
-                            type="search"
-                            name="q"
-                            class="hero-search-input"
-                            placeholder="Search legal news, cases, decisions..."
-                            aria-label="Search legal data"
+                                type="search"
+                                name="q"
+                                class="hero-search-input"
+                                placeholder="Search legal news, cases, decisions..."
+                                aria-label="Search legal data"
                         >
                     </div>
                 </form>
@@ -3670,49 +3416,50 @@ function copyCode(button) {
 
 {% if databases %}
 <section class="databases-section">
-  <h2>Available Data</h2>
-  <div class="database-grid">
-    {% for database in databases %}
-    <div class="card database-card">
-      <h3>
-        <a href="/{{ database.name }}">{{ database.name|title }}</a>
-      </h3>
-      <div class="database-meta">
-        {% if database.table_count is defined and database.table_count %}
-        <span class="table-count">{{ database.table_count }} table{{ database.table_count|pluralize }}</span>
-        {% endif %}
-        {% if database.size is defined and database.size %}
-        <span class="database-size">{{ database.size|filesizeformat }}</span>
-        {% endif %}
-      </div>
-      {% if database.description %}
-      <p class="database-description">{{ database.description }}</p>
-      {% endif %}
+    <h2>Available Data</h2>
+    <div class="database-grid">
+        {% for database in databases %}
+        <div class="card database-card">
+            <h3>
+                <a href="/{{ database.name }}">{{ database.name|title }}</a>
+            </h3>
+            <div class="database-meta">
+                {% if database.table_count is defined and database.table_count %}
+                <span class="table-count">{{ database.table_count }} table{{ database.table_count|pluralize }}</span>
+                {% endif %}
+                {% if database.size is defined and database.size %}
+                <span class="database-size">{{ database.size|filesizeformat }}</span>
+                {% endif %}
+            </div>
+            {% if database.description %}
+            <p class="database-description">{{ database.description }}</p>
+            {% endif %}
 
-      <div class="database-actions">
-        <a href="/{{ database.name }}" class="btn">Explore Data</a>
-        <a href="/{{ database.name }}.json" class="btn btn-secondary">JSON</a>
-      </div>
+            <div class="database-actions">
+                <a href="/{{ database.name }}" class="btn">Explore Data</a>
+                <a href="/{{ database.name }}.json" class="btn btn-secondary">JSON</a>
+            </div>
 
-      {% if database.tables %}
-      <div class="table-preview">
-        <h4>Key Tables:</h4>
-        <ul>
-          {% for table in database.tables[:3] %}
-          <li>
-            <a href="/{{ database.name }}/{{ table.name }}">{{ table.name|title }}</a>
-            {% if table.count is defined and table.count %}<span class="row-count">({{ table.count|safe_format }} rows)</span>{% endif %}
-          </li>
-          {% endfor %}
-          {% if database.tables|length > 3 %}
-          <li><em>...and {{ database.tables|length - 3 }} more</em></li>
-          {% endif %}
-        </ul>
-      </div>
-      {% endif %}
+            {% if database.tables %}
+            <div class="table-preview">
+                <h4>Key Tables:</h4>
+                <ul>
+                    {% for table in database.tables[:3] %}
+                    <li>
+                        <a href="/{{ database.name }}/{{ table.name }}">{{ table.name|title }}</a>
+                        {% if table.count is defined and table.count %}<span class="row-count">({{ table.count|safe_format }} rows)</span>{%
+                        endif %}
+                    </li>
+                    {% endfor %}
+                    {% if database.tables|length > 3 %}
+                    <li><em>...and {{ database.tables|length - 3 }} more</em></li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
     </div>
-    {% endfor %}
-  </div>
 </section>
 {% endif %}
 
@@ -3720,30 +3467,31 @@ function copyCode(button) {
 <div class="section-spacer"></div>
 
 <section class="about-section">
-  <div class="card">
-    <h2>What's Here</h2>
-    <p>Currently focusing on legal news data, with court decisions being added soon. All data is searchable and available through a full SQL interface.</p>
+    <div class="card">
+        <h2>What's Here</h2>
+        <p>Currently focusing on legal news data, with court decisions being added soon. All data is searchable and
+            available through a full SQL interface.</p>
 
-    <div class="features-list">
-      <h3>How to Use</h3>
-      <ul>
-        <li>🔍 <strong>Search</strong> - Full-text search across all legal documents</li>
-        <li>💻 <strong>SQL Queries</strong> - Write custom queries against the database</li>
-        <li>📊 <strong>Export Data</strong> - Download results as JSON or CSV</li>
-        <li>⚡ <strong>Updated Regularly</strong> - Data refreshes automatically</li>
-      </ul>
+        <div class="features-list">
+            <h3>How to Use</h3>
+            <ul>
+                <li>🔍 <strong>Search</strong> - Full-text search across all legal documents</li>
+                <li>💻 <strong>SQL Queries</strong> - Write custom queries against the database</li>
+                <li>📊 <strong>Export Data</strong> - Download results as JSON or CSV</li>
+                <li>⚡ <strong>Updated Regularly</strong> - Data refreshes automatically</li>
+            </ul>
+        </div>
     </div>
-  </div>
 </section>
 
 <section class="sql-section">
-  <div class="card">
-    <h2>🔌 For Developers</h2>
-    <p>Full REST API access to all data. Perfect for building tools or conducting research.</p>
+    <div class="card">
+        <h2>🔌 For Developers</h2>
+        <p>Full REST API access to all data. Perfect for building tools or conducting research.</p>
 
-    <div class="api-example">
-      <h3>Quick Examples</h3>
-      <pre><code># Get all databases
+        <div class="api-example">
+            <h3>Quick Examples</h3>
+            <pre><code># Get all databases
 curl https://data.zeeker.sg/.json
 
 # Search all data
@@ -3751,13 +3499,13 @@ curl "https://data.zeeker.sg/-/search.json?q=contract+law"
 
 # Custom SQL query
 curl "https://data.zeeker.sg/[database]?sql=SELECT * FROM [table] LIMIT 10"</code></pre>
-    </div>
+        </div>
 
-    <div class="api-links">
-      <a href="/-/metadata" class="btn">API Documentation</a>
-      <a href="/[database]?sql=" class="btn btn-secondary">Try SQL Editor</a>
+        <div class="api-links">
+            <a href="/how-to-use" class="btn">How to use</a>
+            <a href="/sglawwatch?sql=SELECT%20name%20FROM%20sqlite_master%20WHERE%20type%3D%27table%27"
+               class="btn btn-secondary">Try SQL Editor</a></div>
     </div>
-  </div>
 </section>
 {% endblock %}
 
@@ -3773,7 +3521,7 @@ curl "https://data.zeeker.sg/[database]?sql=SELECT * FROM [table] LIMIT 10"</cod
 
 {% block extra_head %}
 {{ super() }}
-<meta name="description" content="SQL Query Interface - Zeeker Legal Data Backbone">
+<meta name="description" content="SQL Query Interface - Singapore Legal Data">
 {% endblock %}
 
 {% block nav %}
@@ -3793,196 +3541,273 @@ curl "https://data.zeeker.sg/[database]?sql=SELECT * FROM [table] LIMIT 10"</cod
     <span>SQL Query</span>
     {% endif %}
   </div>
-  {{ super() }}
 
-<div class="query-examples">
+  <div class="query-overview">
+    <div class="query-summary">
+      <h1 class="query-title">SQL Query Interface</h1>
+      <p class="query-description">
+        {% if database %}
+        Write custom SQL queries against the {{ database }} database
+        {% else %}
+        Write custom SQL queries against the available databases
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</div>
+
+{# Let Datasette handle the core query interface #}
+{{ super() }}
+
+<!-- SQL Examples Section -->
+<section class="sql-examples-section">
   <div class="card">
-    <h3>📚 Example Queries</h3>
-    <p>Get started with these common legal data queries:</p>
-    
+    <h2>💻 SQL Examples</h2>
+    {% if database %}
+    <p>Ready-to-use queries for exploring the {{ database }} database:</p>
+    {% else %}
+    <p>Ready-to-use queries for exploring legal data:</p>
+    {% endif %}
+
     <div class="examples-grid">
       <div class="example-card">
-        <h4>🏛️ Court Decisions</h4>
-        <pre><code>-- Find recent Supreme Court decisions
-SELECT title, date, summary 
-FROM court_decisions 
-WHERE court = 'Supreme Court' 
-ORDER BY date DESC 
-LIMIT 20;</code></pre>
-        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
-      </div>
-      
-      <div class="example-card">
-        <h4>📊 Legal Statistics</h4>
-        <pre><code>-- Count cases by court type
-SELECT court, COUNT(*) as case_count
-FROM court_decisions 
-GROUP BY court 
-ORDER BY case_count DESC;</code></pre>
-        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
-      </div>
-      
-      <div class="example-card">
-        <h4>🔍 Text Search</h4>
-        <pre><code>-- Search for contract law cases
-SELECT title, court, date
-FROM court_decisions 
-WHERE title LIKE '%contract%' 
-   OR summary LIKE '%contract%'
-ORDER BY date DESC;</code></pre>
-        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
-      </div>
-      
-      <div class="example-card">
-        <h4>📅 Time Analysis</h4>
-        <pre><code>-- Cases by year
-SELECT strftime('%Y', date) as year,
-       COUNT(*) as cases
-FROM court_decisions 
-GROUP BY year 
-ORDER BY year DESC;</code></pre>
-        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
-      </div>
-      
-      <div class="example-card">
-        <h4>🔗 Table Relationships</h4>
-        <pre><code>-- Join multiple tables
-SELECT d.title, d.date, j.name as judge
-FROM court_decisions d
-JOIN judges j ON d.judge_id = j.id
-WHERE d.date > '2023-01-01';</code></pre>
-        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
-      </div>
-      
-      <div class="example-card">
-        <h4>📋 Schema Exploration</h4>
-        <pre><code>-- View all tables in database
-SELECT name, sql 
-FROM sqlite_master 
-WHERE type = 'table' 
+        <h4>📊 Database Schema</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- View all tables and their structure
+SELECT name, sql
+FROM sqlite_master
+WHERE type = 'table'
 ORDER BY name;</code></pre>
-        <button class="btn btn-small" onclick="useExample(this)">Use This Query</button>
+        </div>
+        <p><em>Explore the complete database schema</em></p>
+        {% set schema_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+name%2C+sql+FROM+sqlite_master+WHERE+type%3D%27table%27+ORDER+BY+name" %}
+        <a href="{{ schema_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      <div class="example-card">
+        <h4>📈 Record Counts</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Count records in each table
+SELECT name as table_name
+FROM sqlite_master
+WHERE type = 'table'
+  AND name != 'sqlite_sequence'
+ORDER BY name;</code></pre>
+        </div>
+        <p><em>List all available tables</em></p>
+        {% set count_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+name+as+table_name+FROM+sqlite_master+WHERE+type%3D%27table%27+AND+name+%21%3D+%27sqlite_sequence%27+ORDER+BY+name" %}
+        <a href="{{ count_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      {% if tables and tables|length > 0 %}
+      {% set first_table = tables[0] %}
+      <div class="example-card">
+        <h4>🔍 Sample Data from {{ first_table.name|title }}</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Get sample records from {{ first_table.name }}
+SELECT *
+FROM "{{ first_table.name }}"
+LIMIT 20;</code></pre>
+        </div>
+        <p><em>Preview data from the {{ first_table.name }} table</em></p>
+        {% set sample_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+*+FROM+%22" + first_table.name + "%22+LIMIT+20" %}
+        <a href="{{ sample_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      <div class="example-card">
+        <h4>📊 Record Count for {{ first_table.name|title }}</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Count total records in {{ first_table.name }}
+SELECT COUNT(*) as total_records
+FROM "{{ first_table.name }}";</code></pre>
+        </div>
+        <p><em>See how many records are in {{ first_table.name }}</em></p>
+        {% set count_table_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+COUNT(*)+as+total_records+FROM+%22" + first_table.name + "%22" %}
+        <a href="{{ count_table_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      {% if first_table.columns %}
+      {% set text_column = '' %}
+      {% set date_column = '' %}
+      {% for column in first_table.columns %}
+        {% if not text_column and column.type|lower in ['text', 'varchar', 'string'] %}
+          {% set text_column = column.name %}
+        {% endif %}
+        {% if not date_column and column.name|lower in ['date', 'created_at', 'updated_at', 'published', 'timestamp'] %}
+          {% set date_column = column.name %}
+        {% endif %}
+      {% endfor %}
+
+      {% if text_column %}
+      <div class="example-card">
+        <h4>🔍 Text Search in {{ first_table.name|title }}</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Search for specific terms in {{ first_table.name }}
+SELECT *
+FROM "{{ first_table.name }}"
+WHERE LOWER("{{ text_column }}") LIKE '%search_term%'
+LIMIT 25;</code></pre>
+        </div>
+        <p><em>Find records containing specific keywords</em></p>
+        {% set search_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+*+FROM+%22" + first_table.name + "%22+WHERE+LOWER(%22" + text_column + "%22)+LIKE+%27%25contract%25%27+LIMIT+25" %}
+        <a href="{{ search_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if date_column %}
+      <div class="example-card">
+        <h4>📅 Recent Records from {{ first_table.name|title }}</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Get recent records from {{ first_table.name }}
+SELECT *
+FROM "{{ first_table.name }}"
+WHERE "{{ date_column }}" >= date('now', '-30 days')
+ORDER BY "{{ date_column }}" DESC
+LIMIT 20;</code></pre>
+        </div>
+        <p><em>See the most recent entries</em></p>
+        {% set recent_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+*+FROM+%22" + first_table.name + "%22+WHERE+%22" + date_column + "%22+%3E%3D+date(%27now%27%2C+%27-30+days%27)+ORDER+BY+%22" + date_column + "%22+DESC+LIMIT+20" %}
+        <a href="{{ recent_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      {% else %}
+      <div class="example-card">
+        <h4>🔍 Sample Data Query</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- First, check what tables are available
+SELECT name
+FROM sqlite_master
+WHERE type = 'table'
+  AND name != 'sqlite_sequence';</code></pre>
+        </div>
+        <p><em>Find available tables, then query them</em></p>
+        {% set sample_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+name+FROM+sqlite_master+WHERE+type%3D%27table%27+AND+name+%21%3D+%27sqlite_sequence%27" %}
+        <a href="{{ sample_url }}" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      <div class="example-card">
+        <h4>🎯 Custom Query Template</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Customize this template
+SELECT
+  -- Choose your columns
+  *
+FROM
+  "your_table_name"
+WHERE
+  -- Add your conditions
+  1=1
+ORDER BY
+  -- Sort your results
+  1
+LIMIT 50;</code></pre>
+        </div>
+        <p><em>Starting point for your own queries</em></p>
+        {% set template_url = "/" + (database if database else "sglawwatch") + "?sql=SELECT+*+FROM+sqlite_master+WHERE+type%3D%27table%27+LIMIT+10" %}
+        <a href="{{ template_url }}" class="try-button">🔗 Try This Query</a>
       </div>
     </div>
-  </div>
-</div>
 
-{% if query_results %}
-<div class="query-results">
-  <div class="results-header">
-    <h2>🎯 Query Results</h2>
-    <div class="results-meta">
-      {% if execution_time %}
-      <span class="execution-time">Executed in {{ execution_time }}ms</span>
-      {% endif %}
-      {% if row_count %}
-      <span class="row-count">{{ "{:,}".format(row_count) }} row{{ row_count|pluralize }}</span>
-      {% endif %}
-    </div>
-    
-    <div class="results-actions">
-      <a href="{{ request.url.replace('_format=table', '_format=json').replace('&_format=table', '&_format=json') }}" class="btn">📊 JSON</a>
-      <a href="{{ request.url.replace('_format=table', '_format=csv').replace('&_format=table', '&_format=csv') }}" class="btn">📈 CSV</a>
-      <button class="btn" onclick="copyResults()">📋 Copy</button>
-    </div>
-  </div>
-  
-  {% if query_results.rows %}
-  <div class="table-wrapper">
-    <table class="rows-and-columns query-results-table">
-      <thead>
-        <tr>
-          {% for column in query_results.columns %}
-          <th>{{ column }}</th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in query_results.rows %}
-        <tr>
-          {% for cell in row %}
-          <td>
-            {% if cell is none %}
-            <em class="null-value">NULL</em>
-            {% elif cell|string|length > 200 %}
-            <details class="long-text">
-              <summary>{{ cell|truncate(50) }}</summary>
-              <div class="full-text">{{ cell }}</div>
-            </details>
-            {% else %}
-            {{ cell }}
-            {% endif %}
-          </td>
-          {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  
-  {% if query_results.truncated %}
-  <div class="results-truncated">
-    <p>⚠️ Results truncated. Showing first {{ query_results.rows|length }} rows. 
-    <a href="{{ request.url }}&_size=5000">Show more</a> or use LIMIT in your query.</p>
-  </div>
-  {% endif %}
-  
-  {% else %}
-  <div class="no-results">
-    <p>✅ Query executed successfully but returned no rows.</p>
-  </div>
-  {% endif %}
-</div>
-{% endif %}
-
-{% if query_error %}
-<div class="query-error">
-  <div class="card error-card">
-    <h3>❌ Query Error</h3>
-    <div class="error-message">
-      <code>{{ query_error }}</code>
-    </div>
-    
-    <div class="error-help">
-      <h4>💡 Common Solutions:</h4>
+    <div class="tip-box">
+      <h4>💡 SQL Tips</h4>
       <ul>
-        <li>Check table and column names for typos</li>
-        <li>Use double quotes for table names with spaces: <code>"table name"</code></li>
-        <li>Verify JOIN conditions and foreign keys</li>
-        <li>Use single quotes for string literals: <code>'text value'</code></li>
-        <li>Check SQL syntax - SQLite dialect</li>
+        <li><strong>Table names:</strong> Use double quotes for safety: <code>"table_name"</code></li>
+        <li><strong>Text search:</strong> Use <code>LIKE '%keyword%'</code> for partial matches</li>
+        <li><strong>Case-insensitive:</strong> Use <code>LOWER(column)</code> for text comparisons</li>
+        <li><strong>Date filtering:</strong> Use <code>date >= '2024-01-01'</code> format</li>
+        <li><strong>Sort results:</strong> Add <code>ORDER BY column_name DESC</code></li>
+        <li><strong>Limit output:</strong> Always use <code>LIMIT</code> for large tables</li>
       </ul>
     </div>
   </div>
-</div>
-{% endif %}
+</section>
 
-<div class="sql-help">
+<!-- Query Tools Section -->
+<section class="query-tools">
   <div class="card">
-    <h3>ℹ️ SQL Query Help</h3>
-    
+    <h2>🛠️ Query Tools</h2>
+
+    <div class="tools-grid">
+      <div class="tool">
+        <h3>📊 Export Results</h3>
+        <p>Download query results in various formats</p>
+        <div class="export-options">
+          <span class="btn disabled" id="json-export">JSON</span>
+          <span class="btn disabled" id="csv-export">CSV</span>
+          <small style="color: var(--color-text-muted); margin-top: 0.5rem; display: block;">Run a query first to enable exports</small>
+        </div>
+      </div>
+
+      <div class="tool">
+        <h3>🔍 Database Explorer</h3>
+        <p>Browse available databases and tables</p>
+        <div class="context-actions">
+          <a href="/" class="btn">Browse All Databases</a>
+          {% if database %}
+          <a href="/{{ database }}" class="btn">{{ database|title }} Tables</a>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="tool">
+        <h3>📚 Documentation</h3>
+        <p>Learn more about using SQL with legal data</p>
+        <div class="context-actions">
+          <a href="/how-to-use" class="btn">How to Use Guide</a>
+          <a href="/sources" class="btn">Data Sources</a>
+        </div>
+      </div>
+
+      <div class="tool">
+        <h3>🔗 Global Search</h3>
+        <p>Search across all legal databases</p>
+        <div class="context-actions">
+          <a href="/-/search" class="btn">Full-Text Search</a>
+        </div>
+      </div>
+
+      <div class="tool">
+        <h3>📋 Query Examples</h3>
+        <p>Common patterns for legal data analysis</p>
+        <div class="context-actions">
+          {% if database %}
+          <a href="/{{ database }}" class="btn">Database Examples</a>
+          {% endif %}
+          <a href="/how-to-use#sql-for-legal-researchers" class="btn">SQL Tutorial</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SQL Help Section -->
+<section class="sql-help">
+  <div class="card">
+    <h2>ℹ️ SQL Help</h2>
+
     <div class="help-sections">
       <div class="help-section">
-        <h4>🎯 Tips for Legal Data Queries</h4>
+        <h4>🎯 Legal Data Query Tips</h4>
         <ul>
-          <li>Use <code>LIKE '%keyword%'</code> for text searches in legal documents</li>
-          <li>Filter by date ranges: <code>WHERE date BETWEEN '2023-01-01' AND '2024-01-01'</code></li>
-          <li>Group by court type: <code>GROUP BY court</code> for statistical analysis</li>
+          <li>Use <code>LIKE '%keyword%'</code> for text searches</li>
+          <li>Filter by date: <code>WHERE date BETWEEN '2023-01-01' AND '2024-01-01'</code></li>
+          <li>Group by categories: <code>GROUP BY category</code></li>
           <li>Order by relevance: <code>ORDER BY date DESC, title ASC</code></li>
-          <li>Limit results for large datasets: <code>LIMIT 100</code></li>
+          <li>Limit results: <code>LIMIT 100</code> for better performance</li>
         </ul>
       </div>
-      
-      <div class="help-section">
-        <h4>⌨️ Keyboard Shortcuts</h4>
-        <ul>
-          <li><kbd>Ctrl+Enter</kbd> - Execute query</li>
-          <li><kbd>Ctrl+/</kbd> - Toggle comments</li>
-          <li><kbd>Tab</kbd> - Indent selected text</li>
-          <li><kbd>Shift+Tab</kbd> - Unindent selected text</li>
-        </ul>
-      </div>
-      
+
       <div class="help-section">
         <h4>🔧 SQLite Functions</h4>
         <ul>
@@ -3990,95 +3815,55 @@ ORDER BY name;</code></pre>
           <li><code>LENGTH(text)</code> - Get text length</li>
           <li><code>UPPER(text)</code> - Convert to uppercase</li>
           <li><code>COUNT(*)</code> - Count rows</li>
-          <li><code>GROUP_CONCAT(column)</code> - Concatenate values</li>
+          <li><code>DISTINCT column</code> - Get unique values</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h4>📊 Common Patterns</h4>
+        <ul>
+          <li>Text search: <code>WHERE LOWER(column) LIKE '%term%'</code></li>
+          <li>Date range: <code>WHERE date >= '2024-01-01'</code></li>
+          <li>Multiple conditions: <code>WHERE condition1 AND condition2</code></li>
+          <li>Null checks: <code>WHERE column IS NOT NULL</code></li>
+          <li>Top results: <code>ORDER BY count DESC LIMIT 10</code></li>
         </ul>
       </div>
     </div>
   </div>
-</div>
+</section>
 
 <script>
-function clearQuery() {
-  document.querySelector('.sql-textarea').value = '';
-}
+// Enable export buttons when there are results
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if there are query results on the page
+    const resultsTable = document.querySelector('.query-results-table, table.rows-and-columns');
+    const jsonExport = document.getElementById('json-export');
+    const csvExport = document.getElementById('csv-export');
 
-function formatQuery() {
-  // Basic SQL formatting
-  const textarea = document.querySelector('.sql-textarea');
-  let sql = textarea.value;
-  
-  // Simple formatting rules
-  sql = sql.replace(/\s+/g, ' '); // Normalize whitespace
-  sql = sql.replace(/\b(SELECT|FROM|WHERE|GROUP BY|ORDER BY|HAVING|JOIN|LEFT JOIN|RIGHT JOIN|INNER JOIN|ON|AND|OR)\b/gi, '\n$1');
-  sql = sql.replace(/,/g, ',\n  '); // Commas on new lines with indent
-  sql = sql.trim();
-  
-  textarea.value = sql;
-}
+    if (resultsTable && jsonExport && csvExport) {
+        // Enable export buttons and make them links
+        const currentUrl = window.location.href;
+        const baseUrl = currentUrl.split('?')[0];
+        const urlParams = new URLSearchParams(window.location.search);
 
-function useExample(button) {
-  const code = button.previousElementSibling.textContent;
-  document.querySelector('.sql-textarea').value = code.trim();
-  document.querySelector('.sql-textarea').focus();
-}
+        if (urlParams.has('sql')) {
+            const sql = urlParams.get('sql');
 
-function saveQuery() {
-  const sql = document.querySelector('.sql-textarea').value;
-  if (sql.trim()) {
-    localStorage.setItem('saved_sql_query', sql);
-    alert('Query saved locally!');
-  }
-}
+            // Create export URLs
+            const jsonUrl = baseUrl + '.json?sql=' + encodeURIComponent(sql);
+            const csvUrl = baseUrl + '.csv?sql=' + encodeURIComponent(sql);
 
-function shareQuery() {
-  const sql = document.querySelector('.sql-textarea').value;
-  if (sql.trim()) {
-    const url = new URL(window.location);
-    url.searchParams.set('sql', sql);
-    navigator.clipboard.writeText(url.toString()).then(() => {
-      alert('Query URL copied to clipboard!');
-    });
-  }
-}
+            // Convert spans to links
+            jsonExport.outerHTML = `<a href="${jsonUrl}" class="btn">JSON</a>`;
+            csvExport.outerHTML = `<a href="${csvUrl}" class="btn">CSV</a>`;
 
-function copyResults() {
-  const table = document.querySelector('.query-results-table');
-  if (table) {
-    const text = Array.from(table.querySelectorAll('tr')).map(row => 
-      Array.from(row.querySelectorAll('th, td')).map(cell => cell.textContent.trim()).join('\t')
-    ).join('\n');
-    
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Results copied to clipboard!');
-    });
-  }
-}
-
-// Keyboard shortcuts
-document.addEventListener('keydown', function(e) {
-  if (e.ctrlKey && e.key === 'Enter') {
-    e.preventDefault();
-    document.querySelector('.query-form').submit();
-  }
+            // Remove the disabled message
+            const message = jsonExport.parentElement.querySelector('small');
+            if (message) message.remove();
+        }
+    }
 });
-
-// Auto-save query
-const textarea = document.querySelector('.sql-textarea');
-if (textarea) {
-  setInterval(() => {
-    if (textarea.value.trim()) {
-      localStorage.setItem('auto_saved_query', textarea.value);
-    }
-  }, 10000); // Auto-save every 10 seconds
-  
-  // Load auto-saved query if no current query
-  if (!textarea.value.trim()) {
-    const saved = localStorage.getItem('auto_saved_query');
-    if (saved) {
-      textarea.value = saved;
-    }
-  }
-}
 </script>
 {% endblock %}
 </document_content>
@@ -4093,6 +3878,176 @@ if (textarea) {
 <meta name="description" content="View record details in {{ table }} - {{ database }}">
 {% endblock %}
 
+<style>
+/* Field Details Styling */
+.field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+.field-item {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    transition: var(--transition-base);
+}
+
+.field-item:hover {
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.field-name {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-sm) 0;
+    font-size: var(--text-base);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+}
+
+.field-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.field-value {
+    flex: 1;
+}
+
+.value-display {
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.field-value.empty .empty-value {
+    color: var(--color-text-muted);
+    font-style: italic;
+    font-size: var(--text-sm);
+}
+
+.field-value details {
+    cursor: pointer;
+}
+
+.field-value summary {
+    color: var(--color-accent-primary);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.field-value .full-value {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    margin-top: var(--space-xs);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.field-meta {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+}
+
+.value-type,
+.value-length {
+    background: var(--color-bg-primary);
+    color: var(--color-text-muted);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.value-type {
+    color: var(--color-accent-magenta);
+}
+
+.value-length {
+    color: var(--color-accent-cyan);
+}
+
+/* Metadata Grid */
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+.metadata-item {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+}
+
+.metadata-item h4 {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-md) 0;
+    font-size: var(--text-lg);
+}
+
+.metadata-item p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+.nav-actions {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.context-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.related-tables {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .field-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+
+    .metadata-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+
+    .nav-actions,
+    .context-actions {
+        flex-direction: column;
+    }
+
+    .related-tables {
+        flex-direction: column;
+    }
+}
+</style>
+
 {% block nav %}
 {% include "_header.html" %}
 {% endblock %}
@@ -4100,6 +4055,17 @@ if (textarea) {
 {% block title %}{{ display_value or "Record" }} - {{ table }} - {{ database }}{% endblock %}
 
 {% block content %}
+{% set first_column = '' %}
+{% set sample_value = '' %}
+{% if row_values %}
+  {% for key, value in row_values.items() %}
+    {% if not first_column and value and value != '' %}
+      {% set first_column = key %}
+      {% set sample_value = value %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
 <div class="row-header">
   <div class="breadcrumbs">
     <a href="/">🏠 Home</a>
@@ -4132,7 +4098,7 @@ if (textarea) {
           {% if row_values and row_values|length %}
           <div class="stat-item">
             <span class="stat-number">{{ row_values|length }}</span>
-            <span class="stat-label">field{{ row_values|length|pluralize }}</span>
+            <span class="stat-label">field{% if row_values|length != 1 %}s{% endif %}</span>
           </div>
           {% endif %}
         </div>
@@ -4154,67 +4120,80 @@ if (textarea) {
 {# Let Datasette handle the core record display #}
 {{ super() }}
 
+
 <section class="row-tools">
   <div class="card">
     <h2>🛠️ Record Tools</h2>
 
     <div class="tools-grid">
       <div class="tool">
-        <h3>📊 Export Record</h3>
-        <p>Download this specific record in various formats</p>
+        <h3>📊 Export This Record</h3>
+        <p>Download this specific record in different formats</p>
         <div class="export-options">
-          <a href="{{ request.url }}.json" class="btn">JSON Format</a>
-          <a href="{{ request.url }}.csv" class="btn">CSV Format</a>
+          <a href="{{ request.url }}.json" class="btn">JSON</a>
+          <a href="{{ request.url }}.csv" class="btn">CSV</a>
         </div>
       </div>
 
+      {% if first_column and sample_value %}
       <div class="tool">
-        <h3>🔍 Find Similar</h3>
-        <p>Search for records with similar characteristics</p>
-        <a href="/{{ database }}/{{ table }}" class="btn">Browse All Records</a>
+        <h3>🔍 Find Similar Records</h3>
+        <p>Records that share the {{ first_column }} value: {{ sample_value }}</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+%22{{ first_column }}%22+%3D+%27{{ sample_value|string|urlencode }}%27" class="btn">Find Similar</a>
       </div>
+      {% endif %}
 
+      {% if pks %}
       <div class="tool">
-        <h3>💻 Query Builder</h3>
-        <p>Build custom SQL queries based on this record</p>
-        {% if pk_path %}
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_path }}+LIMIT+10" class="btn">Query Similar</a>
-        {% else %}
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">Query Table</a>
-        {% endif %}
+        <h3>💻 Query This Record</h3>
+        <p>SQL query targeting this specific record</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}" class="btn">Query Record</a>
       </div>
+      {% endif %}
 
       <div class="tool">
         <h3>🔗 Table Context</h3>
-        <p>Explore the parent table and related data</p>
+        <p>View this record within its table</p>
         <div class="context-actions">
-          <a href="/{{ database }}/{{ table }}" class="btn">View {{ table|title }} Table</a>
-          <a href="/{{ database }}" class="btn">Browse {{ database|title }} Database</a>
+          <a href="/{{ database }}/{{ table }}" class="btn">Browse {{ table|title }}</a>
+          <a href="/{{ database }}" class="btn">{{ database|title }} Database</a>
         </div>
       </div>
 
       {% if foreign_key_tables %}
       <div class="tool">
-        <h3>🔗 Related Data</h3>
-        <p>Explore connections to other tables</p>
+        <h3>🔗 Related Records</h3>
+        <p>Find records in other tables that reference this one</p>
         <div class="related-tables">
           {% for fk_table in foreign_key_tables %}
-          <a href="/{{ database }}/{{ fk_table.other_table }}" class="btn btn-small">{{ fk_table.other_table|title }}</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ fk_table.other_table }}%22+WHERE+%22{{ fk_table.other_column }}%22+%3D+%28SELECT+%22{{ fk_table.column }}%22+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}%29" class="btn btn-small">{{ fk_table.other_table|title }}</a>
           {% endfor %}
         </div>
       </div>
       {% endif %}
 
+      {% if pks %}
       <div class="tool">
-        <h3>📈 Field Analysis</h3>
-        <p>Analyze field values and data patterns</p>
-        {% if row and row|length > 0 %}
-        {% set first_field = row|first %}
-        <a href="/{{ database }}?sql=SELECT+%22{{ first_field }}%22,+COUNT(*)+FROM+%22{{ table }}%22+GROUP+BY+%22{{ first_field }}%22+ORDER+BY+COUNT(*)+DESC" class="btn">Analyze Values</a>
+        <h3>📈 Value Frequency</h3>
+        <p>See how common this record's values are</p>
+        {% if first_column %}
+        <a href="/{{ database }}?sql=SELECT+%22{{ first_column }}%22%2C+COUNT(*)+as+frequency+FROM+%22{{ table }}%22+GROUP+BY+%22{{ first_column }}%22+ORDER+BY+frequency+DESC" class="btn">Analyze {{ first_column }}</a>
         {% else %}
-        <a href="/{{ database }}/{{ table }}" class="btn">Browse Data</a>
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
         {% endif %}
       </div>
+      {% endif %}
+
+      {% if pks %}
+      <div class="tool">
+        <h3>🔄 Navigation</h3>
+        <p>Move to nearby records in the table</p>
+        <div class="nav-actions">
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+rowid+%3C+%28SELECT+rowid+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}%29+ORDER+BY+rowid+DESC+LIMIT+1" class="btn btn-small">← Previous</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+rowid+%3E+%28SELECT+rowid+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}%29+ORDER+BY+rowid+ASC+LIMIT+1" class="btn btn-small">Next →</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -4243,6 +4222,76 @@ if (textarea) {
           <strong>License:</strong> <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY-4.0</a>
         </p>
       </div>
+
+      {% if row_values|length > 0 %}
+      <div class="metadata-item">
+        <h4>Field Summary</h4>
+        <p>
+          <strong>Total Fields:</strong> {{ row_values|length }}<br>
+          <strong>Non-empty Fields:</strong>
+          {% set non_empty_count = 0 %}
+          {% for key, value in row_values.items() %}
+            {% if value and value != '' %}
+              {% set non_empty_count = non_empty_count + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ non_empty_count }}<br>
+          <strong>Completeness:</strong> {{ ((non_empty_count / row_values|length) * 100)|round(1) }}%
+        </p>
+      </div>
+      {% endif %}
+
+      <div class="metadata-item">
+        <h4>Query Examples</h4>
+        <p>
+          <strong>Find this record:</strong> <code>WHERE {{ pks|join(' AND ') if pks else 'rowid = N' }}</code><br>
+          <strong>Export formats:</strong> .json, .csv, .xlsx<br>
+          <strong>API endpoint:</strong> Programmatic access available
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Field Details Section -->
+<section class="field-details">
+  <div class="card">
+    <h2>🔍 Field Analysis</h2>
+    <p>Detailed breakdown of this record's field values:</p>
+
+    <div class="field-grid">
+      {% for key, value in row_values.items() %}
+      <div class="field-item">
+        <h4 class="field-name">{{ key }}</h4>
+        <div class="field-info">
+          {% if value and value != '' %}
+          <div class="field-value">
+            {% if value|string|length > 100 %}
+            <details>
+              <summary>{{ value|string|truncate(50) }}</summary>
+              <div class="full-value">{{ value }}</div>
+            </details>
+            {% else %}
+            <span class="value-display">{{ value }}</span>
+            {% endif %}
+          </div>
+          <div class="field-meta">
+            <span class="value-type">{% if value is number %}number{% elif value is string %}text{% else %}data{% endif %}</span>
+            {% if value|string|length > 0 %}
+            <span class="value-length">{{ value|string|length }} chars</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="field-value empty">
+            <span class="empty-value">NULL</span>
+          </div>
+          <div class="field-meta">
+            <span class="value-type">empty</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </div>
 </section>
@@ -4302,7 +4351,7 @@ if (textarea) {
           {% if columns %}
           <div class="stat-item">
             <span class="stat-number">{{ columns|length }}</span>
-            <span class="stat-label">column{{ columns|length|pluralize }}</span>
+            <span class="stat-label">column{% if columns|length != 1 %}s{% endif %}</span>
           </div>
           {% endif %}
 
@@ -4374,6 +4423,159 @@ if (textarea) {
         <p>Basic statistics and data distribution</p>
         <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_rows+FROM+%22{{ table }}%22" class="btn">View Stats</a>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- SQL Examples specific to this table -->
+<section class="sql-examples-section">
+  <div class="card">
+    <h2>💻 SQL Examples for {{ table|title }}</h2>
+    <p>Ready-to-use queries for exploring {{ table }} data:</p>
+
+    <div class="examples-grid">
+      <div class="example-card">
+        <h4>📊 Basic Table Exploration</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Get first 20 rows
+SELECT *
+FROM "{{ table }}"
+LIMIT 20;</code></pre>
+        </div>
+        <p><em>Quick overview of table contents</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+20" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      <div class="example-card">
+        <h4>📈 Record Count</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Count total records
+SELECT COUNT(*) as total_records
+FROM "{{ table }}";</code></pre>
+        </div>
+        <p><em>See how many records are in this table</em></p>
+        <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_records+FROM+%22{{ table }}%22" class="try-button">🔗 Try This Query</a>
+      </div>
+
+      {% if columns %}
+      {% set date_column = '' %}
+      {% set text_column = '' %}
+      {% set numeric_column = '' %}
+      {% for column in columns %}
+        {% if not date_column and column.name|lower in ['date', 'created_at', 'updated_at', 'published', 'timestamp'] %}
+          {% set date_column = column.name %}
+        {% endif %}
+        {% if not text_column and column.type|lower in ['text', 'varchar', 'string'] %}
+          {% set text_column = column.name %}
+        {% endif %}
+        {% if not numeric_column and column.type|lower in ['integer', 'int', 'number', 'real', 'numeric'] %}
+          {% set numeric_column = column.name %}
+        {% endif %}
+      {% endfor %}
+
+      {% if date_column %}
+      <div class="example-card">
+        <h4>📅 Recent Records</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Get most recent records
+SELECT *
+FROM "{{ table }}"
+ORDER BY "{{ date_column }}" DESC
+LIMIT 15;</code></pre>
+        </div>
+        <p><em>See the newest data in this table</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+ORDER+BY+%22{{ date_column }}%22+DESC+LIMIT+15" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if text_column %}
+      <div class="example-card">
+        <h4>🔍 Text Search</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Search for specific terms
+SELECT *
+FROM "{{ table }}"
+WHERE LOWER("{{ text_column }}") LIKE '%search_term%'
+LIMIT 20;</code></pre>
+        </div>
+        <p><em>Find records containing specific text</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+LOWER(%22{{ text_column }}%22)+LIKE+%27%25search%25%27+LIMIT+20" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if date_column %}
+      <div class="example-card">
+        <h4>📊 Records by Time Period</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Group records by month
+SELECT
+  strftime('%Y-%m', "{{ date_column }}") as month,
+  COUNT(*) as record_count
+FROM "{{ table }}"
+WHERE "{{ date_column }}" IS NOT NULL
+GROUP BY month
+ORDER BY month DESC
+LIMIT 12;</code></pre>
+        </div>
+        <p><em>See data distribution over time</em></p>
+        <a href="/{{ database }}?sql=SELECT+strftime(%27%25Y-%25m%27%2C+%22{{ date_column }}%22)+as+month%2C+COUNT(*)+as+record_count+FROM+%22{{ table }}%22+WHERE+%22{{ date_column }}%22+IS+NOT+NULL+GROUP+BY+month+ORDER+BY+month+DESC+LIMIT+12" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+
+      {% if numeric_column %}
+      <div class="example-card">
+        <h4>📈 Numeric Analysis</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Basic statistics
+SELECT
+  COUNT(*) as total_records,
+  MIN("{{ numeric_column }}") as min_value,
+  MAX("{{ numeric_column }}") as max_value,
+  AVG("{{ numeric_column }}") as avg_value
+FROM "{{ table }}"
+WHERE "{{ numeric_column }}" IS NOT NULL;</code></pre>
+        </div>
+        <p><em>Statistical summary of numeric data</em></p>
+        <a href="/{{ database }}?sql=SELECT+COUNT(*)+as+total_records%2C+MIN(%22{{ numeric_column }}%22)+as+min_value%2C+MAX(%22{{ numeric_column }}%22)+as+max_value%2C+AVG(%22{{ numeric_column }}%22)+as+avg_value+FROM+%22{{ table }}%22+WHERE+%22{{ numeric_column }}%22+IS+NOT+NULL" class="try-button">🔗 Try This Query</a>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <div class="example-card">
+        <h4>🔧 Custom Query Template</h4>
+        <div class="example-box">
+          <button class="copy-btn">📋</button>
+          <pre><code>-- Customize this query
+SELECT
+  -- Choose your columns
+  *
+FROM "{{ table }}"
+WHERE
+  -- Add your conditions
+  1=1
+{% if date_column %}ORDER BY "{{ date_column }}" DESC{% endif %}
+LIMIT 50;</code></pre>
+        </div>
+        <p><em>Starting point for your own queries</em></p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22{% if date_column %}+ORDER+BY+%22{{ date_column }}%22+DESC{% endif %}+LIMIT+50" class="try-button">🔗 Try This Query</a>
+      </div>
+    </div>
+
+    <div class="tip-box">
+      <h4>💡 Query Tips for {{ table|title }}</h4>
+      <ul>
+        <li><strong>Column names:</strong> Use double quotes for safety: <code>"{{ table }}"</code></li>
+        <li><strong>Text search:</strong> Use <code>LIKE '%keyword%'</code> for partial matches</li>
+        <li><strong>Case-insensitive:</strong> Use <code>LOWER(column)</code> for text comparisons</li>
+        <li><strong>Sort results:</strong> Add <code>ORDER BY column_name DESC</code></li>
+        <li><strong>Limit output:</strong> Always use <code>LIMIT</code> for large tables</li>
+      </ul>
     </div>
   </div>
 </section>
@@ -4498,17 +4700,6 @@ if (textarea) {
         </div>
     </section>
 
-    <section class="current-status">
-        <div class="card">
-            <h2>📅 Current Status</h2>
-            <p>
-                <strong>Legal News Database:</strong> Active and regularly updated<br>
-                <strong>Court Decisions:</strong> Coming soon<br>
-                <strong>Parliamentary Data:</strong> Planned for future release
-            </p>
-        </div>
-    </section>
-
     <section class="cta-section">
         <h2>🚀 Get Started</h2>
         <p>Ready to explore Singapore legal data? Start with a search or dive into the SQL interface.</p>
@@ -4530,382 +4721,186 @@ if (textarea) {
 <document index="29">
 <source>./templates/pages/how-to-use.html</source>
 <document_content>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>How to Use This Site - data.zeeker.sg</title>
-    <meta name="description" content="Practical guide for legal researchers and hackers - get the most out of Singapore legal data">
+{% extends "default:base.html" %}
 
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+{% block extra_head %}
+<meta name="description" content="Practical guide for legal researchers and hackers - get the most out of Singapore legal data">
+<meta name="keywords" content="Singapore law, legal data, research guide, SQL tutorials">
+{% endblock %}
 
-    <!-- Styles -->
-    <link rel="stylesheet" href="/static/css/zeeker-theme.css">
+{% block nav %}
+{% include "_header.html" %}
+{% endblock %}
 
-    <style>
-        .guide-hero {
-            background: linear-gradient(135deg, var(--color-bg-secondary), var(--color-bg-tertiary));
-            border-radius: var(--radius-xl);
-            padding: var(--space-2xl) var(--space-xl);
-            text-align: center;
-            margin-bottom: var(--space-2xl);
-            position: relative;
-            overflow: hidden;
-        }
+{% block title %}How to Use This Site - data.zeeker.sg{% endblock %}
 
-        .guide-hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--color-accent-cyan), var(--color-accent-magenta));
-        }
+{% block content %}
+<div class="container">
+    <div class="guide-hero">
+        <h1>📚 How to Use This Site</h1>
+        <p>
+            A practical guide for legal researchers, academics, and anyone who wants to
+            dig into Singapore legal data. No corporate jargon, just useful techniques.
+        </p>
+    </div>
 
-        .method-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: var(--space-xl);
-            margin: var(--space-xl) 0;
-        }
+    <section class="quick-overview">
+        <div class="card">
+            <h2>🎯 What You Can Do Here</h2>
+            <p>
+                This site contains Singapore legal news and (soon) court decisions in a searchable database.
+                You can search through it, run custom queries, and export data for your own analysis.
+            </p>
 
-        .method-card {
-            background: var(--color-bg-secondary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-xl);
-            padding: var(--space-xl);
-            transition: var(--transition-base);
-        }
+            <div class="method-cards">
+                <div class="method-card">
+                    <div class="method-number">1</div>
+                    <h3>🔍 Search Everything</h3>
+                    <p>Full-text search across all legal documents. Good for finding specific cases or topics.</p>
+                    <a href="/-/search" class="btn btn-primary">Try Global Search</a>
+                </div>
 
-        .method-card:hover {
-            border-color: var(--color-accent-cyan);
-            transform: translateY(-2px);
-        }
+                <div class="method-card">
+                    <div class="method-number">2</div>
+                    <h3>📊 Browse by Database</h3>
+                    <p>Explore structured data table by table. See what's available and get a feel for the data.</p>
+                    <a href="/" class="btn btn-primary">Browse Databases</a>
+                </div>
 
-        .method-number {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 2rem;
-            height: 2rem;
-            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
-            color: white;
-            border-radius: 50%;
-            font-weight: 600;
-            margin-bottom: var(--space-md);
-        }
+                <div class="method-card">
+                    <div class="method-number">3</div>
+                    <h3>💻 Query with SQL</h3>
+                    <p>Write custom queries to slice and dice the data however you need. Don't worry, we'll help.</p>
+                    <a href="/sglawwatch?sql=" class="btn btn-primary">Open SQL Editor</a>
+                </div>
 
-        .example-box {
-            background: var(--color-bg-primary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-md);
-            padding: var(--space-md);
-            margin: var(--space-md) 0;
-            position: relative;
-        }
+                <div class="method-card">
+                    <div class="method-number">4</div>
+                    <h3>📈 Export Your Results</h3>
+                    <p>Download search results or query outputs as JSON, CSV, or SQLite files for further analysis.</p>
+                </div>
+            </div>
+        </div>
+    </section>
 
-        .example-box pre {
-            margin: 0;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: var(--text-sm);
-            line-height: 1.5;
-            color: var(--color-text-secondary);
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
+    <section class="use-cases">
+        <h2>🛠️ Common Legal Research Tasks</h2>
+        <p>Here's how to tackle typical legal research questions using this site:</p>
 
-        .copy-btn {
-            position: absolute;
-            top: var(--space-sm);
-            right: var(--space-sm);
-            background: var(--color-accent-primary);
-            color: white;
-            border: none;
-            padding: var(--space-xs) var(--space-sm);
-            border-radius: var(--radius-sm);
-            font-size: var(--text-xs);
-            cursor: pointer;
-            transition: var(--transition-fast);
-        }
+        <div class="use-case-grid">
+            <div class="use-case">
+                <h3>📰 Track Legal Developments</h3>
+                <p><strong>Goal:</strong> Stay updated on specific areas of law</p>
+                <p><strong>Method:</strong> Use search with focused keywords, then bookmark the URL to check regularly.</p>
 
-        .copy-btn:hover {
-            background: var(--color-accent-hover);
-        }
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>Search for: "intellectual property"
+Then bookmark: /-/search?q=intellectual+property</code></pre>
+                </div>
 
-        .use-case-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: var(--space-xl);
-            margin: var(--space-xl) 0;
-        }
-
-        .use-case {
-            background: var(--color-bg-tertiary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-xl);
-        }
-
-        .use-case h3 {
-            color: var(--color-accent-cyan);
-            margin: 0 0 var(--space-md) 0;
-        }
-
-        .sql-helper {
-            background: var(--color-bg-secondary);
-            border: 2px solid var(--color-accent-magenta);
-            border-radius: var(--radius-xl);
-            padding: var(--space-xl);
-            margin: var(--space-2xl) 0;
-        }
-
-        .sql-examples {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: var(--space-lg);
-            margin: var(--space-lg) 0;
-        }
-
-        .sql-example {
-            background: var(--color-bg-tertiary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-lg);
-            padding: var(--space-lg);
-        }
-
-        .sql-example h4 {
-            color: var(--color-accent-cyan);
-            margin: 0 0 var(--space-sm) 0;
-            font-size: var(--text-base);
-        }
-
-        .try-button {
-            display: inline-flex;
-            align-items: center;
-            gap: var(--space-xs);
-            padding: var(--space-sm) var(--space-md);
-            background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-accent-magenta));
-            color: white;
-            text-decoration: none;
-            border-radius: var(--radius-md);
-            font-size: var(--text-sm);
-            font-weight: 500;
-            transition: var(--transition-fast);
-            margin-top: var(--space-sm);
-        }
-
-        .try-button:hover {
-            transform: translateY(-1px);
-            color: white;
-            text-decoration: none;
-        }
-
-        .tip-box {
-            background: rgba(0, 212, 255, 0.1);
-            border: 1px solid var(--color-accent-cyan);
-            border-radius: var(--radius-md);
-            padding: var(--space-md);
-            margin: var(--space-md) 0;
-        }
-
-        .tip-box h4 {
-            color: var(--color-accent-cyan);
-            margin: 0 0 var(--space-sm) 0;
-            font-size: var(--text-sm);
-        }
-
-        .export-formats {
-            display: flex;
-            gap: var(--space-sm);
-            margin: var(--space-md) 0;
-            flex-wrap: wrap;
-        }
-
-        .format-badge {
-            padding: var(--space-xs) var(--space-sm);
-            background: var(--color-bg-tertiary);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-sm);
-            font-size: var(--text-xs);
-            font-family: 'JetBrains Mono', monospace;
-            color: var(--color-accent-cyan);
-        }
-    </style>
-</head>
-
-<body>
-    {% include "_header.html" %}
-
-    <main>
-        <div class="container">
-            <div class="guide-hero">
-                <h1>📚 How to Use This Site</h1>
-                <p>
-                    A practical guide for legal researchers, academics, and anyone who wants to
-                    dig into Singapore legal data. No corporate jargon, just useful techniques.
-                </p>
+                <a href="/-/search?q=intellectual+property" class="try-button">🔗 Try This Search</a>
             </div>
 
-            <section class="quick-overview">
-                <div class="card">
-                    <h2>🎯 What You Can Do Here</h2>
-                    <p>
-                        This site contains Singapore legal news and (soon) court decisions in a searchable database.
-                        You can search through it, run custom queries, and export data for your own analysis.
-                    </p>
+            <div class="use-case">
+                <h3>📊 Analyze Legal Topic Trends</h3>
+                <p><strong>Goal:</strong> See how often certain topics appear over time</p>
+                <p><strong>Method:</strong> SQL query to count mentions by month/year</p>
 
-                    <div class="method-cards">
-                        <div class="method-card">
-                            <div class="method-number">1</div>
-                            <h3>🔍 Search Everything</h3>
-                            <p>Full-text search across all legal documents. Good for finding specific cases or topics.</p>
-                            <a href="/-/search" class="btn btn-primary">Try Global Search</a>
-                        </div>
-
-                        <div class="method-card">
-                            <div class="method-number">2</div>
-                            <h3>📊 Browse by Database</h3>
-                            <p>Explore structured data table by table. See what's available and get a feel for the data.</p>
-                            <a href="/" class="btn btn-primary">Browse Databases</a>
-                        </div>
-
-                        <div class="method-card">
-                            <div class="method-number">3</div>
-                            <h3>💻 Query with SQL</h3>
-                            <p>Write custom queries to slice and dice the data however you need. Don't worry, we'll help.</p>
-                            <a href="/sglawwatch?sql=" class="btn btn-primary">Open SQL Editor</a>
-                        </div>
-
-                        <div class="method-card">
-                            <div class="method-number">4</div>
-                            <h3>📈 Export Your Results</h3>
-                            <p>Download search results or query outputs as JSON, CSV, or SQLite files for further analysis.</p>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="use-cases">
-                <h2>🛠️ Common Legal Research Tasks</h2>
-                <p>Here's how to tackle typical legal research questions using this site:</p>
-
-                <div class="use-case-grid">
-                    <div class="use-case">
-                        <h3>📰 Track Legal Developments</h3>
-                        <p><strong>Goal:</strong> Stay updated on specific areas of law</p>
-                        <p><strong>Method:</strong> Use search with focused keywords, then bookmark the URL to check regularly.</p>
-
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>Search for: "intellectual property"
-Then bookmark: /-/search?q=intellectual+property</pre>
-                        </div>
-
-                        <a href="/-/search?q=intellectual+property" class="try-button">🔗 Try This Search</a>
-                    </div>
-
-                    <div class="use-case">
-                        <h3>📊 Analyze Legal Topic Trends</h3>
-                        <p><strong>Goal:</strong> See how often certain topics appear over time</p>
-                        <p><strong>Method:</strong> SQL query to count mentions by month/year</p>
-
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT strftime('%Y-%m', date) as month,
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT strftime('%Y-%m', date) as month,
        COUNT(*) as mentions
 FROM headlines
 WHERE LOWER(text) LIKE '%employment%'
    OR LOWER(title) LIKE '%employment%'
 GROUP BY month
 HAVING month IS NOT NULL
-ORDER BY month DESC</pre>
-                        </div>
-
-                        <a href="/sglawwatch?sql=SELECT+strftime%28%27%25Y-%25m%27%2C+date%29+as+month%2C%0A+++++++COUNT%28*%29+as+mentions+%0AFROM+headlines+%0AWHERE+LOWER%28text%29+LIKE+%27%25employment%25%27%0A+++OR+LOWER%28title%29+LIKE+%27%25employment%25%27%0AGROUP+BY+month+%0AHAVING+month+IS+NOT+NULL%0AORDER+BY+month+DESC" class="try-button">🔗 Try This Query</a>
-                    </div>
-
-                    <div class="use-case">
-                        <h3>🔍 Find Case References</h3>
-                        <p><strong>Goal:</strong> Locate mentions of specific cases or legal principles</p>
-                        <p><strong>Method:</strong> Search with case names, citations, or legal concepts</p>
-
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>Search for: "[2024] SGCA"
-Or: "Spandeck Engineering"
-Or: "duty of care"</pre>
-                        </div>
-
-                        <a href="/-/search?q=%5B2024%5D+SGCA" class="try-button">🔗 Try Case Citation Search</a>
-                    </div>
-
-                    <div class="use-case">
-                        <h3>📈 Export for Analysis</h3>
-                        <p><strong>Goal:</strong> Get data into Excel, R, Python, etc. for deeper analysis</p>
-                        <p><strong>Method:</strong> Add .csv or .json to any URL</p>
-
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>Any search: /-/search.csv?q=your+search
-All headlines: /sglawwatch/headlines.csv
-Custom query: /sglawwatch.csv?sql=your+query</pre>
-                        </div>
-
-                        <div class="export-formats">
-                            <span class="format-badge">.json</span>
-                            <span class="format-badge">.csv</span>
-                            <span class="format-badge">.db</span>
-                        </div>
-
-                        <a href="/sglawwatch/headlines.csv?_size=100" class="try-button">🔗 Download Sample CSV</a>
-                    </div>
+ORDER BY month DESC</code></pre>
                 </div>
-            </section>
 
-            <div class="sql-helper">
-                <h2>💻 SQL for Legal Researchers</h2>
-                <p>
-                    SQL might look intimidating, but it's just a way to ask specific questions about data.
-                    Here are the most useful patterns for legal research:
-                </p>
+                <a href="/sglawwatch?sql=SELECT+strftime%28%27%25Y-%25m%27%2C+date%29+as+month%2C%0A+++++++COUNT%28*%29+as+mentions+%0AFROM+headlines+%0AWHERE+LOWER%28text%29+LIKE+%27%25employment%25%27%0A+++OR+LOWER%28title%29+LIKE+%27%25employment%25%27%0AGROUP+BY+month+%0AHAVING+month+IS+NOT+NULL%0AORDER+BY+month+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
 
-                <div class="sql-examples">
-                    <div class="sql-example">
-                        <h4>📅 Find Recent Headlines</h4>
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT title, date
+            <div class="use-case">
+                <h3>🔍 Find Case References</h3>
+                <p><strong>Goal:</strong> Locate mentions of specific cases or legal principles</p>
+                <p><strong>Method:</strong> Search with case names, citations, or legal concepts</p>
+
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>Search for: "[2024] SGCA"
+Or: "Spandeck Engineering"
+Or: "duty of care"</code></pre>
+                </div>
+
+                <a href="/-/search?q=%5B2024%5D+SGCA" class="try-button">🔗 Try Case Citation Search</a>
+            </div>
+
+            <div class="use-case">
+                <h3>📈 Export for Analysis</h3>
+                <p><strong>Goal:</strong> Get data into Excel, R, Python, etc. for deeper analysis</p>
+                <p><strong>Method:</strong> Add .csv or .json to any URL</p>
+
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>Any search: /-/search.csv?q=your+search
+All headlines: /sglawwatch/headlines.csv
+Custom query: /sglawwatch.csv?sql=your+query</code></pre>
+                </div>
+
+                <div class="export-formats">
+                    <span class="format-badge">.json</span>
+                    <span class="format-badge">.csv</span>
+                    <span class="format-badge">.db</span>
+                </div>
+
+                <a href="/sglawwatch/headlines.csv?_size=100" class="try-button">🔗 Download Sample CSV</a>
+            </div>
+        </div>
+    </section>
+
+    <div class="sql-helper">
+        <h2>💻 SQL for Legal Researchers</h2>
+        <p>
+            SQL might look intimidating, but it's just a way to ask specific questions about data.
+            Here are the most useful patterns for legal research:
+        </p>
+
+        <div class="sql-examples">
+            <div class="sql-example">
+                <h4>📅 Find Recent Headlines</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
 FROM headlines
 WHERE date > '2024-01-01'
 ORDER BY date DESC
-LIMIT 20</pre>
-                        </div>
-                        <p><em>Gets the 20 most recent headlines since January 2024</em></p>
-                        <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+date+%3E+%272024-01-01%27+%0AORDER+BY+date+DESC+%0ALIMIT+20" class="try-button">🔗 Try This Query</a>
-                    </div>
+LIMIT 20</code></pre>
+                </div>
+                <p><em>Gets the 20 most recent headlines since January 2024</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+date+%3E+%272024-01-01%27+%0AORDER+BY+date+DESC+%0ALIMIT+20" class="try-button">🔗 Try This Query</a>
+            </div>
 
-                    <div class="sql-example">
-                        <h4>🔍 Search for Negligence Cases</h4>
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT title, date
+            <div class="sql-example">
+                <h4>🔍 Search for Negligence Cases</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
 FROM headlines
 WHERE LOWER(text) LIKE '%negligence%'
    OR LOWER(title) LIKE '%negligence%'
-ORDER BY date DESC</pre>
-                        </div>
-                        <p><em>Finds all headlines mentioning "negligence" anywhere in title or text</em></p>
-                        <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+LOWER%28text%29+LIKE+%27%25negligence%25%27+%0A+++OR+LOWER%28title%29+LIKE+%27%25negligence%25%27%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
-                    </div>
+ORDER BY date DESC</code></pre>
+                </div>
+                <p><em>Finds all headlines mentioning "negligence" anywhere in title or text</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+LOWER%28text%29+LIKE+%27%25negligence%25%27+%0A+++OR+LOWER%28title%29+LIKE+%27%25negligence%25%27%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
 
-                    <div class="sql-example">
-                        <h4>📊 Contract Mentions Over Time</h4>
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT strftime('%Y-%m', date) as month,
+            <div class="sql-example">
+                <h4>📊 Contract Mentions Over Time</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT strftime('%Y-%m', date) as month,
        COUNT(*) as mentions
 FROM headlines
 WHERE LOWER(text) LIKE '%contract%'
@@ -4913,49 +4908,49 @@ WHERE LOWER(text) LIKE '%contract%'
 GROUP BY month
 HAVING month IS NOT NULL
 ORDER BY month DESC
-LIMIT 24</pre>
-                        </div>
-                        <p><em>Shows contract-related headlines by month for the last 2 years</em></p>
-                        <a href="/sglawwatch?sql=--+Contract+mentions+over+time%0D%0ASELECT%0D%0A++strftime%28%27%25Y-%25m%27%2C+date%29+as+month%2C%0D%0A++COUNT%28*%29+as+mentions%0D%0AFROM%0D%0A++headlines%0D%0AWHERE%0D%0A++LOWER%28text%29+LIKE+%27%25contract%25%27%0D%0A++OR+LOWER%28title%29+LIKE+%27%25contract%25%27%0D%0AGROUP+BY%0D%0A++month%0D%0AHAVING%0D%0A++month+IS+NOT+NULL%0D%0AORDER+BY%0D%0A++month+DESC%0D%0ALIMIT%0D%0A++24%3B" class="try-button">🔗 Try This Query</a>
-                    </div>
+LIMIT 24</code></pre>
+                </div>
+                <p><em>Shows contract-related headlines by month for the last 2 years</em></p>
+                <a href="/sglawwatch?sql=--+Contract+mentions+over+time%0D%0ASELECT%0D%0A++strftime%28%27%25Y-%25m%27%2C+date%29+as+month%2C%0D%0A++COUNT%28*%29+as+mentions%0D%0AFROM%0D%0A++headlines%0D%0AWHERE%0D%0A++LOWER%28text%29+LIKE+%27%25contract%25%27%0D%0A++OR+LOWER%28title%29+LIKE+%27%25contract%25%27%0D%0AGROUP+BY%0D%0A++month%0D%0AHAVING%0D%0A++month+IS+NOT+NULL%0D%0AORDER+BY%0D%0A++month+DESC%0D%0ALIMIT%0D%0A++24%3B" class="try-button">🔗 Try This Query</a>
+            </div>
 
-                    <div class="sql-example">
-                        <h4>🎯 Complex Legal Search</h4>
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT title, date
+            <div class="sql-example">
+                <h4>🎯 Complex Legal Search</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
 FROM headlines
 WHERE (LOWER(text) LIKE '%intellectual property%'
    OR LOWER(text) LIKE '%copyright%'
    OR LOWER(text) LIKE '%patent%')
    AND date > '2023-01-01'
-ORDER BY date DESC</pre>
-                        </div>
-                        <p><em>IP-related headlines from 2023 onwards</em></p>
-                        <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+%28LOWER%28text%29+LIKE+%27%25intellectual+property%25%27+%0A+++OR+LOWER%28text%29+LIKE+%27%25copyright%25%27%0A+++OR+LOWER%28text%29+LIKE+%27%25patent%25%27%29+%0A+++AND+date+%3E+%272023-01-01%27+%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
-                    </div>
+ORDER BY date DESC</code></pre>
+                </div>
+                <p><em>IP-related headlines from 2023 onwards</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+%28LOWER%28text%29+LIKE+%27%25intellectual+property%25%27+%0A+++OR+LOWER%28text%29+LIKE+%27%25copyright%25%27%0A+++OR+LOWER%28text%29+LIKE+%27%25patent%25%27%29+%0A+++AND+date+%3E+%272023-01-01%27+%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
 
-                    <div class="sql-example">
-                        <h4>⚖️ Find Case Citations</h4>
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT title, date
+            <div class="sql-example">
+                <h4>⚖️ Find Case Citations</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT title, date
 FROM headlines
 WHERE text LIKE '%[2024]%'
    OR text LIKE '%[2023]%'
    OR text LIKE '%SGCA%'
    OR text LIKE '%SGHC%'
-ORDER BY date DESC</pre>
-                        </div>
-                        <p><em>Headlines containing legal citations from Singapore courts</em></p>
-                        <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+text+LIKE+%27%25%5B2024%5D%25%27+%0A+++OR+text+LIKE+%27%25%5B2023%5D%25%27%0A+++OR+text+LIKE+%27%25SGCA%25%27%0A+++OR+text+LIKE+%27%25SGHC%25%27%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
-                    </div>
+ORDER BY date DESC</code></pre>
+                </div>
+                <p><em>Headlines containing legal citations from Singapore courts</em></p>
+                <a href="/sglawwatch?sql=SELECT+title%2C+date+%0AFROM+headlines+%0AWHERE+text+LIKE+%27%25%5B2024%5D%25%27+%0A+++OR+text+LIKE+%27%25%5B2023%5D%25%27%0A+++OR+text+LIKE+%27%25SGCA%25%27%0A+++OR+text+LIKE+%27%25SGHC%25%27%0AORDER+BY+date+DESC" class="try-button">🔗 Try This Query</a>
+            </div>
 
-                    <div class="sql-example">
-                        <h4>📈 Weekly Activity Trends</h4>
-                        <div class="example-box">
-                            <button class="copy-btn" onclick="copyCode(this)">📋</button>
-                            <pre>SELECT
+            <div class="sql-example">
+                <h4>📈 Weekly Activity Trends</h4>
+                <div class="example-box">
+                    <button class="copy-btn">📋</button>
+                    <pre><code>SELECT
   strftime('%Y-W%W', date) as week,
   COUNT(*) as headlines_count
 FROM
@@ -4968,160 +4963,147 @@ GROUP BY
 ORDER BY
   strftime('%Y-W%W', date) DESC
 LIMIT
-  12</pre>
-                        </div>
-                        <p><em>Weekly headline counts for the last 12 weeks</em></p>
-                        <a href="/sglawwatch?sql=SELECT+strftime%28%27%25Y-W%25W%27%2C+date%29+as+week%2C%0A+++++++COUNT%28*%29+as+headlines_count%0AFROM+headlines%0AWHERE+date+%3E%3D+%272024-01-01%27%0A++AND+date+IS+NOT+NULL%0AGROUP+BY+strftime%28%27%25Y-W%25W%27%2C+date%29%0AORDER+BY+strftime%28%27%25Y-W%25W%27%2C+date%29+DESC%0ALIMIT+12" class="try-button">🔗 Try This Query</a>
+  12</code></pre>
+                </div>
+                <p><em>Weekly headline counts for the last 12 weeks</em></p>
+                <a href="/sglawwatch?sql=SELECT+strftime%28%27%25Y-W%25W%27%2C+date%29+as+week%2C%0A+++++++COUNT%28*%29+as+headlines_count%0AFROM+headlines%0AWHERE+date+%3E%3D+%272024-01-01%27%0A++AND+date+IS+NOT+NULL%0AGROUP+BY+strftime%28%27%25Y-W%25W%27%2C+date%29%0AORDER+BY+strftime%28%27%25Y-W%25W%27%2C+date%29+DESC%0ALIMIT+12" class="try-button">🔗 Try This Query</a>
+            </div>
+        </div>
+
+        <div class="tip-box">
+            <h4>💡 SQL Tips for Legal Research</h4>
+            <ul>
+                <li><strong>Use % as wildcard:</strong> <code>'%contract%'</code> finds "contract", "contracts", "contractual"</li>
+                <li><strong>Combine searches:</strong> <code>OR</code> for either term, <code>AND</code> for both terms</li>
+                <li><strong>Sort results:</strong> <code>ORDER BY date DESC</code> for newest first</li>
+                <li><strong>Limit results:</strong> <code>LIMIT 50</code> to avoid overwhelming output</li>
+                <li><strong>Date ranges:</strong> <code>date BETWEEN '2023-01-01' AND '2023-12-31'</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <section class="getting-data-out">
+        <div class="card">
+            <h2>📤 Getting Data Out</h2>
+            <p>Once you've found what you need, here's how to export it for further analysis:</p>
+
+            <div class="method-cards">
+                <div class="method-card">
+                    <h3>📊 For Excel/Google Sheets</h3>
+                    <p>Add <code>.csv</code> to any URL. CSV files open directly in spreadsheet software.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>/-/search.csv?q=employment+law
+/sglawwatch/headlines.csv?_size=1000</code></pre>
+                    </div>
+                    <a href="/sglawwatch/headlines.csv?_size=50" class="try-button">🔗 Try CSV Export</a>
+                </div>
+
+                <div class="method-card">
+                    <h3>🤖 For Programming (Python/R/etc)</h3>
+                    <p>Add <code>.json</code> to any URL. JSON is easier to work with in code.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>import requests
+url = 'https://data.zeeker.sg/sglawwatch/headlines.json'
+data = requests.get(url).json()</code></pre>
+                    </div>
+                    <a href="/sglawwatch/headlines.json?_size=10" class="try-button">🔗 Try JSON Export</a>
+                </div>
+
+                <div class="method-card">
+                    <h3>💾 Entire Database</h3>
+                    <p>Download the full SQLite database file for offline analysis.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>/sglawwatch.db
+# Opens in DB Browser for SQLite, etc.</code></pre>
+                    </div>
+                    <a href="/sglawwatch.db" class="try-button">🔗 Download Database</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="advanced-tips">
+        <div class="card">
+            <h2>🎓 Advanced Techniques</h2>
+
+            <div class="use-case-grid">
+                <div class="use-case">
+                    <h3>🔗 Bookmarkable Searches</h3>
+                    <p>Every search and query creates a unique URL you can bookmark or share.</p>
+                    <div class="tip-box">
+                        <h4>💡 Pro Tip</h4>
+                        <p>Create bookmarks for regular searches like "privacy law updates" or "employment tribunal decisions"</p>
                     </div>
                 </div>
 
-                <div class="tip-box">
-                    <h4>💡 SQL Tips for Legal Research</h4>
-                    <ul>
-                        <li><strong>Use % as wildcard:</strong> <code>'%contract%'</code> finds "contract", "contracts", "contractual"</li>
-                        <li><strong>Combine searches:</strong> <code>OR</code> for either term, <code>AND</code> for both terms</li>
-                        <li><strong>Sort results:</strong> <code>ORDER BY date DESC</code> for newest first</li>
-                        <li><strong>Limit results:</strong> <code>LIMIT 50</code> to avoid overwhelming output</li>
-                        <li><strong>Date ranges:</strong> <code>date BETWEEN '2023-01-01' AND '2023-12-31'</code></li>
+                <div class="use-case">
+                    <h3>📱 Mobile Access</h3>
+                    <p>The site works on phones/tablets. Great for checking references while in court or meetings.</p>
+                </div>
+
+                <div class="use-case">
+                    <h3>🔄 Automated Monitoring</h3>
+                    <p>Use tools like IFTTT or Zapier to monitor JSON endpoints for new data matching your criteria.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>Check: /sglawwatch/headlines.json?_search=privacy&_size=1
+If row count increases, trigger alert</code></pre>
+                    </div>
+                </div>
+
+                <div class="use-case">
+                    <h3>🎯 Citation Analysis</h3>
+                    <p>Search for case citations to see how often cases are referenced in legal news.</p>
+                    <div class="example-box">
+                        <button class="copy-btn">📋</button>
+                        <pre><code>Search: "[2024] SGCA 15"
+Or: "Spandeck Engineering"
+Or: "Carrian Investments"</code></pre>
+                    </div>
+                    <a href="/-/search?q=Spandeck+Engineering" class="try-button">🔗 Try Citation Search</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="help-section">
+        <div class="card">
+            <h2>🤝 Need Help?</h2>
+            <p>This is a personal project, but I'm happy to help if you get stuck:</p>
+
+            <div class="method-cards">
+                <div class="method-card">
+                    <h3>📧 Email Questions</h3>
+                    <p>For help with specific queries or if something's broken</p>
+                    <a href="mailto:hello@zeeker.sg" class="btn btn-primary">hello@zeeker.sg</a>
+                </div>
+
+                <div class="method-card">
+                    <h3>💡 Suggest Features</h3>
+                    <p>Ideas for new data sources or analysis features</p>
+                    <p><em>Just drop me a line with your use case</em></p>
+                </div>
+
+                <div class="method-card">
+                    <h3>📚 More Resources</h3>
+                    <ul style="text-align: left;">
+                        <li><a href="/sources">Data Sources & Attribution</a></li>
+                        <li><a href="https://docs.datasette.io/" target="_blank">Datasette Documentation</a> (the underlying platform)</li>
+                        <li><a href="https://sqlitebrowser.org/" target="_blank">DB Browser for SQLite</a> (for offline analysis)</li>
                     </ul>
                 </div>
             </div>
-
-            <section class="getting-data-out">
-                <div class="card">
-                    <h2>📤 Getting Data Out</h2>
-                    <p>Once you've found what you need, here's how to export it for further analysis:</p>
-
-                    <div class="method-cards">
-                        <div class="method-card">
-                            <h3>📊 For Excel/Google Sheets</h3>
-                            <p>Add <code>.csv</code> to any URL. CSV files open directly in spreadsheet software.</p>
-                            <div class="example-box">
-                                <pre>/-/search.csv?q=employment+law
-/sglawwatch/headlines.csv?_size=1000</pre>
-                            </div>
-                            <a href="/sglawwatch/headlines.csv?_size=50" class="try-button">🔗 Try CSV Export</a>
-                        </div>
-
-                        <div class="method-card">
-                            <h3>🤖 For Programming (Python/R/etc)</h3>
-                            <p>Add <code>.json</code> to any URL. JSON is easier to work with in code.</p>
-                            <div class="example-box">
-                                <pre>import requests
-url = 'https://data.zeeker.sg/sglawwatch/headlines.json'
-data = requests.get(url).json()</pre>
-                            </div>
-                            <a href="/sglawwatch/headlines.json?_size=10" class="try-button">🔗 Try JSON Export</a>
-                        </div>
-
-                        <div class="method-card">
-                            <h3>💾 Entire Database</h3>
-                            <p>Download the full SQLite database file for offline analysis.</p>
-                            <div class="example-box">
-                                <pre>/sglawwatch.db
-# Opens in DB Browser for SQLite, etc.</pre>
-                            </div>
-                            <a href="/sglawwatch.db" class="try-button">🔗 Download Database</a>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="advanced-tips">
-                <div class="card">
-                    <h2>🎓 Advanced Techniques</h2>
-
-                    <div class="use-case-grid">
-                        <div class="use-case">
-                            <h3>🔗 Bookmarkable Searches</h3>
-                            <p>Every search and query creates a unique URL you can bookmark or share.</p>
-                            <div class="tip-box">
-                                <h4>💡 Pro Tip</h4>
-                                <p>Create bookmarks for regular searches like "privacy law updates" or "employment tribunal decisions"</p>
-                            </div>
-                        </div>
-
-                        <div class="use-case">
-                            <h3>📱 Mobile Access</h3>
-                            <p>The site works on phones/tablets. Great for checking references while in court or meetings.</p>
-                        </div>
-
-                        <div class="use-case">
-                            <h3>🔄 Automated Monitoring</h3>
-                            <p>Use tools like IFTTT or Zapier to monitor JSON endpoints for new data matching your criteria.</p>
-                            <div class="example-box">
-                                <pre>Check: /sglawwatch/headlines.json?_search=privacy&_size=1
-If row count increases, trigger alert</pre>
-                            </div>
-                        </div>
-
-                        <div class="use-case">
-                            <h3>🎯 Citation Analysis</h3>
-                            <p>Search for case citations to see how often cases are referenced in legal news.</p>
-                            <div class="example-box">
-                                <pre>Search: "[2024] SGCA 15"
-Or: "Spandeck Engineering"
-Or: "Carrian Investments"</pre>
-                            </div>
-                            <a href="/-/search?q=Spandeck+Engineering" class="try-button">🔗 Try Citation Search</a>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="help-section">
-                <div class="card">
-                    <h2>🤝 Need Help?</h2>
-                    <p>This is a personal project, but I'm happy to help if you get stuck:</p>
-
-                    <div class="method-cards">
-                        <div class="method-card">
-                            <h3>📧 Email Questions</h3>
-                            <p>For help with specific queries or if something's broken</p>
-                            <a href="mailto:hello@zeeker.sg" class="btn btn-primary">hello@zeeker.sg</a>
-                        </div>
-
-                        <div class="method-card">
-                            <h3>💡 Suggest Features</h3>
-                            <p>Ideas for new data sources or analysis features</p>
-                            <p><em>Just drop me a line with your use case</em></p>
-                        </div>
-
-                        <div class="method-card">
-                            <h3>📚 More Resources</h3>
-                            <ul style="text-align: left;">
-                                <li><a href="/sources">Data Sources & Attribution</a></li>
-                                <li><a href="https://docs.datasette.io/" target="_blank">Datasette Documentation</a> (the underlying platform)</li>
-                                <li><a href="https://sqlitebrowser.org/" target="_blank">DB Browser for SQLite</a> (for offline analysis)</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </section>
         </div>
-    </main>
+    </section>
+</div>
+{% endblock %}
 
-    {% include "_footer.html" %}
-
-    <script>
-        function copyCode(button) {
-            const codeBlock = button.nextElementSibling;
-            const text = codeBlock.textContent;
-
-            navigator.clipboard.writeText(text).then(() => {
-                const originalText = button.textContent;
-                button.textContent = '✅ Copied!';
-                button.style.background = '#10B981';
-
-                setTimeout(() => {
-                    button.textContent = originalText;
-                    button.style.background = '';
-                }, 2000);
-            });
-        }
-    </script>
-</body>
-</html>
+{% block footer %}
+{% include "_footer.html" %}
+{% endblock %}
 </document_content>
 </document>
 <document index="30">
@@ -7253,27 +7235,172 @@ table.rows-and-columns a:hover,
 }
 
 /*
- * FORMS
+ * FORMS - Comprehensive Override
  */
-input, textarea, select {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
+input, textarea, select, button[type="submit"] {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md);
-    color: var(--color-text-primary);
+    color: var(--color-text-primary) !important;
     padding: var(--space-sm);
     outline: none;
     transition: var(--transition-base);
+    font-family: inherit;
 }
 
 input:focus, textarea:focus, select:focus {
-    border-color: var(--color-accent-primary);
-    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+    border-color: var(--color-accent-primary) !important;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15) !important;
+    background: var(--color-bg-primary) !important;
 }
 
-input::placeholder {
-    color: var(--color-text-muted);
+input::placeholder, textarea::placeholder {
+    color: var(--color-text-muted) !important;
 }
 
+/* Catch ALL possible Datasette form elements */
+.filters input,
+.filters select,
+.filters textarea,
+form input,
+form select,
+form textarea,
+form button,
+.export-links input,
+.csv-export input,
+.metadata input,
+.metadata select,
+.metadata textarea,
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="tel"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="time"],
+select,
+textarea,
+.sql-editor textarea,
+.query-form input,
+.query-form select,
+.query-form textarea {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* Override any remaining white backgrounds */
+*[style*="background-color: white"],
+*[style*="background-color: #fff"],
+*[style*="background-color: #ffffff"],
+*[style*="background: white"],
+*[style*="background: #fff"],
+*[style*="background: #ffffff"] {
+    background: var(--color-bg-secondary) !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Apply/submit buttons */
+input[type="submit"],
+button[type="submit"],
+.btn-primary,
+button.btn-primary {
+    background: var(--color-accent-primary) !important;
+    color: white !important;
+    border: 1px solid var(--color-accent-primary) !important;
+}
+
+input[type="submit"]:hover,
+button[type="submit"]:hover,
+.btn-primary:hover {
+    background: var(--color-accent-hover) !important;
+    border-color: var(--color-accent-hover) !important;
+}
+
+/* Datasette specific elements that might be white */
+.metadata-form,
+.metadata-form input,
+.metadata-form select,
+.metadata-form textarea,
+.export-form,
+.export-form input,
+.export-form select,
+.query-form,
+.query-form input,
+.query-form select,
+.query-form textarea {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Any remaining form containers */
+.form-group,
+.field,
+.control,
+div[class*="form"],
+div[class*="input"] {
+    background: transparent !important;
+}
+
+/* Nuclear option for any stubborn white backgrounds */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Datasette Advanced Export Section */
+#export,
+.advanced-export,
+.advanced-export form,
+.advanced-export p,
+.export-widget,
+.export-options {
+    background: var(--color-bg-secondary) !important;
+    color: var(--color-text-primary) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+    padding: var(--space-md) !important;
+}
+
+.advanced-export h3 {
+    color: var(--color-text-primary) !important;
+    background: transparent !important;
+}
+
+.advanced-export label {
+    color: var(--color-text-secondary) !important;
+    background: transparent !important;
+}
+
+.advanced-export input[type="checkbox"] {
+    background: var(--color-bg-tertiary) !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+.advanced-export input[type="submit"] {
+    background: var(--color-accent-primary) !important;
+    color: white !important;
+    border: 1px solid var(--color-accent-primary) !important;
+}
+
+/* Any remaining export-related elements */
+div[id*="export"],
+div[class*="export"],
+.csv-export,
+.json-export {
+    background: var(--color-bg-secondary) !important;
+    color: var(--color-text-primary) !important;
+}
 /*
  * UTILITIES
  */

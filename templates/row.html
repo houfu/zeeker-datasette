@@ -5,6 +5,176 @@
 <meta name="description" content="View record details in {{ table }} - {{ database }}">
 {% endblock %}
 
+<style>
+/* Field Details Styling */
+.field-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+.field-item {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-md);
+    transition: var(--transition-base);
+}
+
+.field-item:hover {
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.field-name {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-sm) 0;
+    font-size: var(--text-base);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+}
+
+.field-info {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.field-value {
+    flex: 1;
+}
+
+.value-display {
+    color: var(--color-text-primary);
+    font-size: var(--text-sm);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.field-value.empty .empty-value {
+    color: var(--color-text-muted);
+    font-style: italic;
+    font-size: var(--text-sm);
+}
+
+.field-value details {
+    cursor: pointer;
+}
+
+.field-value summary {
+    color: var(--color-accent-primary);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.field-value .full-value {
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    margin-top: var(--space-xs);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.field-meta {
+    display: flex;
+    gap: var(--space-sm);
+    margin-top: var(--space-xs);
+}
+
+.value-type,
+.value-length {
+    background: var(--color-bg-primary);
+    color: var(--color-text-muted);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-xs);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.value-type {
+    color: var(--color-accent-magenta);
+}
+
+.value-length {
+    color: var(--color-accent-cyan);
+}
+
+/* Metadata Grid */
+.metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-lg);
+    margin-top: var(--space-lg);
+}
+
+.metadata-item {
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+}
+
+.metadata-item h4 {
+    color: var(--color-accent-cyan);
+    margin: 0 0 var(--space-md) 0;
+    font-size: var(--text-lg);
+}
+
+.metadata-item p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--text-sm);
+    line-height: 1.5;
+}
+
+.nav-actions {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+.context-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.related-tables {
+    display: flex;
+    gap: var(--space-xs);
+    flex-wrap: wrap;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .field-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+
+    .metadata-grid {
+        grid-template-columns: 1fr;
+        gap: var(--space-md);
+    }
+
+    .nav-actions,
+    .context-actions {
+        flex-direction: column;
+    }
+
+    .related-tables {
+        flex-direction: column;
+    }
+}
+</style>
+
 {% block nav %}
 {% include "_header.html" %}
 {% endblock %}
@@ -12,6 +182,17 @@
 {% block title %}{{ display_value or "Record" }} - {{ table }} - {{ database }}{% endblock %}
 
 {% block content %}
+{% set first_column = '' %}
+{% set sample_value = '' %}
+{% if row_values %}
+  {% for key, value in row_values.items() %}
+    {% if not first_column and value and value != '' %}
+      {% set first_column = key %}
+      {% set sample_value = value %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
 <div class="row-header">
   <div class="breadcrumbs">
     <a href="/">🏠 Home</a>
@@ -44,7 +225,7 @@
           {% if row_values and row_values|length %}
           <div class="stat-item">
             <span class="stat-number">{{ row_values|length }}</span>
-            <span class="stat-label">field{{ row_values|length|pluralize }}</span>
+            <span class="stat-label">field{% if row_values|length != 1 %}s{% endif %}</span>
           </div>
           {% endif %}
         </div>
@@ -66,67 +247,80 @@
 {# Let Datasette handle the core record display #}
 {{ super() }}
 
+
 <section class="row-tools">
   <div class="card">
     <h2>🛠️ Record Tools</h2>
 
     <div class="tools-grid">
       <div class="tool">
-        <h3>📊 Export Record</h3>
-        <p>Download this specific record in various formats</p>
+        <h3>📊 Export This Record</h3>
+        <p>Download this specific record in different formats</p>
         <div class="export-options">
-          <a href="{{ request.url }}.json" class="btn">JSON Format</a>
-          <a href="{{ request.url }}.csv" class="btn">CSV Format</a>
+          <a href="{{ request.url }}.json" class="btn">JSON</a>
+          <a href="{{ request.url }}.csv" class="btn">CSV</a>
         </div>
       </div>
 
+      {% if first_column and sample_value %}
       <div class="tool">
-        <h3>🔍 Find Similar</h3>
-        <p>Search for records with similar characteristics</p>
-        <a href="/{{ database }}/{{ table }}" class="btn">Browse All Records</a>
+        <h3>🔍 Find Similar Records</h3>
+        <p>Records that share the {{ first_column }} value: {{ sample_value }}</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+%22{{ first_column }}%22+%3D+%27{{ sample_value|string|urlencode }}%27" class="btn">Find Similar</a>
       </div>
+      {% endif %}
 
+      {% if pks %}
       <div class="tool">
-        <h3>💻 Query Builder</h3>
-        <p>Build custom SQL queries based on this record</p>
-        {% if pk_path %}
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pk_path }}+LIMIT+10" class="btn">Query Similar</a>
-        {% else %}
-        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+LIMIT+10" class="btn">Query Table</a>
-        {% endif %}
+        <h3>💻 Query This Record</h3>
+        <p>SQL query targeting this specific record</p>
+        <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}" class="btn">Query Record</a>
       </div>
+      {% endif %}
 
       <div class="tool">
         <h3>🔗 Table Context</h3>
-        <p>Explore the parent table and related data</p>
+        <p>View this record within its table</p>
         <div class="context-actions">
-          <a href="/{{ database }}/{{ table }}" class="btn">View {{ table|title }} Table</a>
-          <a href="/{{ database }}" class="btn">Browse {{ database|title }} Database</a>
+          <a href="/{{ database }}/{{ table }}" class="btn">Browse {{ table|title }}</a>
+          <a href="/{{ database }}" class="btn">{{ database|title }} Database</a>
         </div>
       </div>
 
       {% if foreign_key_tables %}
       <div class="tool">
-        <h3>🔗 Related Data</h3>
-        <p>Explore connections to other tables</p>
+        <h3>🔗 Related Records</h3>
+        <p>Find records in other tables that reference this one</p>
         <div class="related-tables">
           {% for fk_table in foreign_key_tables %}
-          <a href="/{{ database }}/{{ fk_table.other_table }}" class="btn btn-small">{{ fk_table.other_table|title }}</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ fk_table.other_table }}%22+WHERE+%22{{ fk_table.other_column }}%22+%3D+%28SELECT+%22{{ fk_table.column }}%22+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}%29" class="btn btn-small">{{ fk_table.other_table|title }}</a>
           {% endfor %}
         </div>
       </div>
       {% endif %}
 
+      {% if pks %}
       <div class="tool">
-        <h3>📈 Field Analysis</h3>
-        <p>Analyze field values and data patterns</p>
-        {% if row and row|length > 0 %}
-        {% set first_field = row|first %}
-        <a href="/{{ database }}?sql=SELECT+%22{{ first_field }}%22,+COUNT(*)+FROM+%22{{ table }}%22+GROUP+BY+%22{{ first_field }}%22+ORDER+BY+COUNT(*)+DESC" class="btn">Analyze Values</a>
+        <h3>📈 Value Frequency</h3>
+        <p>See how common this record's values are</p>
+        {% if first_column %}
+        <a href="/{{ database }}?sql=SELECT+%22{{ first_column }}%22%2C+COUNT(*)+as+frequency+FROM+%22{{ table }}%22+GROUP+BY+%22{{ first_column }}%22+ORDER+BY+frequency+DESC" class="btn">Analyze {{ first_column }}</a>
         {% else %}
-        <a href="/{{ database }}/{{ table }}" class="btn">Browse Data</a>
+        <a href="/{{ database }}/{{ table }}" class="btn">Browse Table</a>
         {% endif %}
       </div>
+      {% endif %}
+
+      {% if pks %}
+      <div class="tool">
+        <h3>🔄 Navigation</h3>
+        <p>Move to nearby records in the table</p>
+        <div class="nav-actions">
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+rowid+%3C+%28SELECT+rowid+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}%29+ORDER+BY+rowid+DESC+LIMIT+1" class="btn btn-small">← Previous</a>
+          <a href="/{{ database }}?sql=SELECT+*+FROM+%22{{ table }}%22+WHERE+rowid+%3E+%28SELECT+rowid+FROM+%22{{ table }}%22+WHERE+{{ pks|join('+AND+')|urlencode }}%29+ORDER+BY+rowid+ASC+LIMIT+1" class="btn btn-small">Next →</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -155,6 +349,76 @@
           <strong>License:</strong> <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank">CC-BY-4.0</a>
         </p>
       </div>
+
+      {% if row_values|length > 0 %}
+      <div class="metadata-item">
+        <h4>Field Summary</h4>
+        <p>
+          <strong>Total Fields:</strong> {{ row_values|length }}<br>
+          <strong>Non-empty Fields:</strong>
+          {% set non_empty_count = 0 %}
+          {% for key, value in row_values.items() %}
+            {% if value and value != '' %}
+              {% set non_empty_count = non_empty_count + 1 %}
+            {% endif %}
+          {% endfor %}
+          {{ non_empty_count }}<br>
+          <strong>Completeness:</strong> {{ ((non_empty_count / row_values|length) * 100)|round(1) }}%
+        </p>
+      </div>
+      {% endif %}
+
+      <div class="metadata-item">
+        <h4>Query Examples</h4>
+        <p>
+          <strong>Find this record:</strong> <code>WHERE {{ pks|join(' AND ') if pks else 'rowid = N' }}</code><br>
+          <strong>Export formats:</strong> .json, .csv, .xlsx<br>
+          <strong>API endpoint:</strong> Programmatic access available
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Field Details Section -->
+<section class="field-details">
+  <div class="card">
+    <h2>🔍 Field Analysis</h2>
+    <p>Detailed breakdown of this record's field values:</p>
+
+    <div class="field-grid">
+      {% for key, value in row_values.items() %}
+      <div class="field-item">
+        <h4 class="field-name">{{ key }}</h4>
+        <div class="field-info">
+          {% if value and value != '' %}
+          <div class="field-value">
+            {% if value|string|length > 100 %}
+            <details>
+              <summary>{{ value|string|truncate(50) }}</summary>
+              <div class="full-value">{{ value }}</div>
+            </details>
+            {% else %}
+            <span class="value-display">{{ value }}</span>
+            {% endif %}
+          </div>
+          <div class="field-meta">
+            <span class="value-type">{% if value is number %}number{% elif value is string %}text{% else %}data{% endif %}</span>
+            {% if value|string|length > 0 %}
+            <span class="value-length">{{ value|string|length }} chars</span>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="field-value empty">
+            <span class="empty-value">NULL</span>
+          </div>
+          <div class="field-meta">
+            <span class="value-type">empty</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </div>
 </section>

@@ -1202,27 +1202,172 @@ table.rows-and-columns a:hover,
 }
 
 /*
- * FORMS
+ * FORMS - Comprehensive Override
  */
-input, textarea, select {
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
+input, textarea, select, button[type="submit"] {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
     border-radius: var(--radius-md);
-    color: var(--color-text-primary);
+    color: var(--color-text-primary) !important;
     padding: var(--space-sm);
     outline: none;
     transition: var(--transition-base);
+    font-family: inherit;
 }
 
 input:focus, textarea:focus, select:focus {
-    border-color: var(--color-accent-primary);
-    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15);
+    border-color: var(--color-accent-primary) !important;
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.15) !important;
+    background: var(--color-bg-primary) !important;
 }
 
-input::placeholder {
-    color: var(--color-text-muted);
+input::placeholder, textarea::placeholder {
+    color: var(--color-text-muted) !important;
 }
 
+/* Catch ALL possible Datasette form elements */
+.filters input,
+.filters select,
+.filters textarea,
+form input,
+form select,
+form textarea,
+form button,
+.export-links input,
+.csv-export input,
+.metadata input,
+.metadata select,
+.metadata textarea,
+input[type="text"],
+input[type="search"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="tel"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="time"],
+select,
+textarea,
+.sql-editor textarea,
+.query-form input,
+.query-form select,
+.query-form textarea {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+    border-radius: var(--radius-md) !important;
+}
+
+/* Override any remaining white backgrounds */
+*[style*="background-color: white"],
+*[style*="background-color: #fff"],
+*[style*="background-color: #ffffff"],
+*[style*="background: white"],
+*[style*="background: #fff"],
+*[style*="background: #ffffff"] {
+    background: var(--color-bg-secondary) !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Apply/submit buttons */
+input[type="submit"],
+button[type="submit"],
+.btn-primary,
+button.btn-primary {
+    background: var(--color-accent-primary) !important;
+    color: white !important;
+    border: 1px solid var(--color-accent-primary) !important;
+}
+
+input[type="submit"]:hover,
+button[type="submit"]:hover,
+.btn-primary:hover {
+    background: var(--color-accent-hover) !important;
+    border-color: var(--color-accent-hover) !important;
+}
+
+/* Datasette specific elements that might be white */
+.metadata-form,
+.metadata-form input,
+.metadata-form select,
+.metadata-form textarea,
+.export-form,
+.export-form input,
+.export-form select,
+.query-form,
+.query-form input,
+.query-form select,
+.query-form textarea {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Any remaining form containers */
+.form-group,
+.field,
+.control,
+div[class*="form"],
+div[class*="input"] {
+    background: transparent !important;
+}
+
+/* Nuclear option for any stubborn white backgrounds */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+}
+
+/* Datasette Advanced Export Section */
+#export,
+.advanced-export,
+.advanced-export form,
+.advanced-export p,
+.export-widget,
+.export-options {
+    background: var(--color-bg-secondary) !important;
+    color: var(--color-text-primary) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+    padding: var(--space-md) !important;
+}
+
+.advanced-export h3 {
+    color: var(--color-text-primary) !important;
+    background: transparent !important;
+}
+
+.advanced-export label {
+    color: var(--color-text-secondary) !important;
+    background: transparent !important;
+}
+
+.advanced-export input[type="checkbox"] {
+    background: var(--color-bg-tertiary) !important;
+    border: 1px solid var(--color-border) !important;
+}
+
+.advanced-export input[type="submit"] {
+    background: var(--color-accent-primary) !important;
+    color: white !important;
+    border: 1px solid var(--color-accent-primary) !important;
+}
+
+/* Any remaining export-related elements */
+div[id*="export"],
+div[class*="export"],
+.csv-export,
+.json-export {
+    background: var(--color-bg-secondary) !important;
+    color: var(--color-text-primary) !important;
+}
 /*
  * UTILITIES
  */
