@@ -50,7 +50,6 @@ def setup_logging(verbose=False):
         level=level,
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
-            logging.FileHandler("/var/log/datasette-refresh.log"),
             logging.StreamHandler(),
         ],
     )
