@@ -103,104 +103,109 @@
 
     <div class="tables-grid">
         {% for table in tables %}
-        <div class="card table-card">
-            <div class="table-header">
-                <h3>
-                    <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
-                </h3>
+        {% if show_hidden or not table.hidden %}
+        <div class="db-table">
+            <div class="card table-card">
+                <div class="table-header">
+                    <h3>
+                        <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
+                    </h3>
 
-                <div class="table-badges">
-                    {% if table.count is defined and table.count is not none %}
-                    <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
-                    {% endif %}
-
-                    {% if table.columns %}
-                    <span class="badge badge-columns">{{ table.columns|length }} columns</span>
-                    {% endif %}
-
-                    {% if table.fts %}
-                    <span class="badge badge-fts">🔍 Searchable</span>
-                    {% endif %}
-
-                    {% if table.has_primary_key %}
-                    <span class="badge badge-pk">🔑 Primary Key</span>
-                    {% endif %}
-                </div>
-            </div>
-
-            {% if table.description %}
-            <p class="table-description">{{ table.description }}</p>
-            {% endif %}
-
-            {% if table.columns %}
-            <div class="table-schema">
-                <h4>Key Columns:</h4>
-                <div class="column-list">
-                    {% for column in table.columns[:5] %}
-                    <div class="column-item">
-                        <span class="column-name">{{ column.name }}</span>
-                        <span class="column-type">{{ column.type }}</span>
-                        {% if column.is_pk %}
-                        <span class="column-flag">PK</span>
+                    <div class="table-badges">
+                        {% if table.count is defined and table.count is not none %}
+                        <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
                         {% endif %}
-                        {% if column.notnull %}
-                        <span class="column-flag">NOT NULL</span>
+
+                        {% if table.columns %}
+                        <span class="badge badge-columns">{{ table.columns|length }} columns</span>
+                        {% endif %}
+
+                        {% if table.fts %}
+                        <span class="badge badge-fts">🔍 Searchable</span>
+                        {% endif %}
+
+                        {% if table.has_primary_key %}
+                        <span class="badge badge-pk">🔑 Primary Key</span>
                         {% endif %}
                     </div>
-                    {% endfor %}
-                    {% if table.columns|length > 5 %}
-                    <div class="column-item more-columns">
-                        <em>...and {{ table.columns|length - 5 }} more column{% if (table.columns|length - 5) != 1 %}s{%
-                            endif %}</em>
-                    </div>
-                    {% endif %}
                 </div>
-            </div>
-            {% endif %}
 
-            {% if table.sample_rows %}
-            <div class="table-preview">
-                <h4>Sample Data:</h4>
-                <div class="preview-table">
-                    <table>
-                        <thead>
-                        <tr>
-                            {% for column in table.columns[:3] %}
-                            <th>{{ column.name }}</th>
-                            {% endfor %}
-                            {% if table.columns|length > 3 %}
-                            <th>...</th>
-                            {% endif %}
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for row in table.sample_rows[:2] %}
-                        <tr>
-                            {% for cell in row[:3] %}
-                            <td>{{ cell|truncate(30) }}</td>
-                            {% endfor %}
-                            {% if table.columns|length > 3 %}
-                            <td>...</td>
-                            {% endif %}
-                        </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            {% endif %}
-
-            <div class="table-actions">
-                <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore</a>
-                <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
-                <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
-                {% if table.fts %}
-                <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
+                {% if table.description %}
+                <p class="table-description">{{ table.description }}</p>
                 {% endif %}
+
+                {% if table.columns %}
+                <div class="table-schema">
+                    <h4>Key Columns:</h4>
+                    <div class="column-list">
+                        {% for column in table.columns[:5] %}
+                        <div class="column-item">
+                            <span class="column-name">{{ column.name }}</span>
+                            <span class="column-type">{{ column.type }}</span>
+                            {% if column.is_pk %}
+                            <span class="column-flag">PK</span>
+                            {% endif %}
+                            {% if column.notnull %}
+                            <span class="column-flag">NOT NULL</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if table.columns|length > 5 %}
+                        <div class="column-item more-columns">
+                            <em>...and {{ table.columns|length - 5 }} more column{% if (table.columns|length - 5) != 1
+                                %}s{%
+                                endif %}</em>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if table.sample_rows %}
+                <div class="table-preview">
+                    <h4>Sample Data:</h4>
+                    <div class="preview-table">
+                        <table>
+                            <thead>
+                            <tr>
+                                {% for column in table.columns[:3] %}
+                                <th>{{ column.name }}</th>
+                                {% endfor %}
+                                {% if table.columns|length > 3 %}
+                                <th>...</th>
+                                {% endif %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in table.sample_rows[:2] %}
+                            <tr>
+                                {% for cell in row[:3] %}
+                                <td>{{ cell|truncate(30) }}</td>
+                                {% endfor %}
+                                {% if table.columns|length > 3 %}
+                                <td>...</td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="table-actions">
+                    <a href="/{{ database }}/{{ table.name }}" class="btn btn-primary">Explore</a>
+                    <a href="/{{ database }}/{{ table.name }}.json" class="btn">JSON</a>
+                    <a href="/{{ database }}/{{ table.name }}.csv" class="btn">CSV</a>
+                    {% if table.fts %}
+                    <a href="/{{ database }}/{{ table.name }}?_search=" class="btn">🔍 Search</a>
+                    {% endif %}
+                </div>
             </div>
+            {% endif %}
+
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
 </section>
 {% else %}
 <section class="no-tables">
