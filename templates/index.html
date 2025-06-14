@@ -95,7 +95,13 @@
         {% for database in databases %}
         <div class="card database-card">
             <h3>
-                <a href="/{{ database.name }}">{{ database.name|title }}</a>
+                <a href="/{{ database.name }}">
+                    {% if metadata.databases[database.name] and metadata.databases[database.name].title %}
+                    {{ metadata.databases[database.name].title }}
+                    {% else %}
+                    {{ database.name|title }}
+                    {% endif %}
+                </a>
             </h3>
             <div class="database-meta">
                 {% if database.table_count is defined and database.table_count %}
@@ -107,32 +113,16 @@
             </div>
             {% if database.description %}
             <p class="database-description">{{ database.description }}</p>
+            {% elif metadata.databases[database.name] and metadata.databases[database.name].description %}
+            <p class="database-description">{{ metadata.databases[database.name].description }}</p>
             {% endif %}
 
             <div class="database-actions">
                 <a href="/{{ database.name }}" class="btn">Explore Data</a>
                 <a href="/{{ database.name }}.json" class="btn btn-secondary">JSON</a>
             </div>
-
-            {% if database.tables %}
-            <div class="table-preview">
-                <h4>Key Tables:</h4>
-                <ul>
-                    {% for table in database.tables[:3] %}
-                    <li>
-                        <a href="/{{ database.name }}/{{ table.name }}">{{ table.name|title }}</a>
-                        {% if table.count is defined and table.count %}<span class="row-count">({{ table.count|safe_format }} rows)</span>{%
-                        endif %}
-                    </li>
-                    {% endfor %}
-                    {% if database.tables|length > 3 %}
-                    <li><em>...and {{ database.tables|length - 3 }} more</em></li>
-                    {% endif %}
-                </ul>
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
+    </div>
+    {% endfor %}
     </div>
 </section>
 {% endif %}

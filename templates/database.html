@@ -15,7 +15,7 @@
     <div class="breadcrumbs">
         <a href="/">🏠 Home</a>
         <span class="separator">→</span>
-        <span>{{ database|title }}</span>
+        <span>{{ metadata.title|title }}</span>
     </div>
 
     <!-- Database overview card -->
@@ -24,10 +24,10 @@
 
             <!-- Left side: Title, description, stats -->
             <div class="database-summary">
-                <h1 class="database-title">{{ database|title }}</h1>
+                <h1 class="database-title">{{ metadata.title|title }} ({{database}})</h1>
 
-                {% if database_description %}
-                <p class="database-subtitle">{{ database_description }}</p>
+                {% if metadata.description %}
+                <p class="database-subtitle">{{ metadata.description }}</p>
                 {% else %}
                 <p class="database-subtitle">
                     Searchable Singapore legal data
@@ -37,19 +37,21 @@
                 <!-- Database Statistics -->
                 <div class="database-stats">
                     {% if tables %}
+                    {% set visible_tables = tables|rejectattr('hidden')|list %}
                     <div class="stat-item">
-                        <span class="stat-number">{{ tables|length }}</span>
-                        <span class="stat-label">table{% if tables|length != 1 %}s{% endif %}</span>
+                        <span class="stat-number">{{ visible_tables|length }}</span>
+                        <span class="stat-label">table{% if visible_tables|length != 1 %}s{% endif %} (excludes hidden)</span>
                     </div>
                     {% endif %}
 
                     {% if tables %}
-                    {% set total_rows = 0 %}
+                    {% set counts = [] %}
                     {% for table in tables %}
-                    {% if table.count %}
-                    {% set total_rows = total_rows + table.count %}
+                    {% if table.count and not table.hidden %}
+                    {% set _ = counts.append(table.count) %}
                     {% endif %}
                     {% endfor %}
+                    {% set total_rows = counts | sum %}
                     {% if total_rows > 0 %}
                     <div class="stat-item">
                         <span class="stat-number">{{ "{:,}".format(total_rows) }}</span>
@@ -58,9 +60,9 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if database_size is defined and database_size %}
+                    {% if size is defined and size %}
                     <div class="stat-item">
-                        <span class="stat-number">{{ database_size|filesizeformat }}</span>
+                        <span class="stat-number">{{ size|filesizeformat }}</span>
                         <span class="stat-label">size</span>
                     </div>
                     {% endif %}
@@ -108,30 +110,56 @@
             <div class="card table-card">
                 <div class="table-header">
                     <h3>
-                        <a href="/{{ database }}/{{ table.name }}">{{ table.name|title }}</a>
+                        <a href="/{{ database }}/{{ table.name }}">{{ metadata.tables[table.name].title|title }} ({{
+                            table.name }})</a>
                     </h3>
 
-                    <div class="table-badges">
+                    <div class="database-stats">
                         {% if table.count is defined and table.count is not none %}
-                        <span class="badge badge-rows">{{ "{:,}".format(table.count) }} rows</span>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ "{:,}".format(table.count) }}</span>
+                            <span class="stat-label">total rows</span>
+                        </div>
                         {% endif %}
 
                         {% if table.columns %}
-                        <span class="badge badge-columns">{{ table.columns|length }} columns</span>
+                        <div class="stat-item">
+                            <span class="stat-number">{{ "{:,}".format(table.columns|list|length) }}</span>
+                            <span class="stat-label">total columns</span>
+                        </div>
                         {% endif %}
 
-                        {% if table.fts %}
-                        <span class="badge badge-fts">🔍 Searchable</span>
+                        {% if table.fts_table %}
+                        <div class="stat-item">
+                            <span class="stat-number">🔍</span>
+                            <span class="stat-label">Searchable</span>
+                        </div>
                         {% endif %}
 
-                        {% if table.has_primary_key %}
-                        <span class="badge badge-pk">🔑 Primary Key</span>
+                        {% if table.primary_keys %}
+                        <div class="stat-item">
+                            <span class="stat-number">🔑</span>
+                            <span class="stat-label">Primary Key</span>
+                        </div>
+                        {% endif %}
+
+                        {% set visible_tables = tables|rejectattr('hidden')|list %}
+                        {% set fk_counts = [] %}
+                        {% for table in visible_tables %}
+                        {% set _ = fk_counts.append((table.foreign_keys.incoming|length) + (table.foreign_keys.outgoing|length)) %}
+                        {% endfor %}
+                        {% set fk_count = fk_counts|sum %}
+                        {% if fk_count > 0 %}
+                        <div class="stat-item">
+                            <span class="stat-number">{{ fk_count }}</span>
+                            <span class="stat-label">foreign key{% if fk_count != 1 %}s{% endif %}</span>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
 
-                {% if table.description %}
-                <p class="table-description">{{ table.description }}</p>
+                {% if metadata.tables[table.name].description %}
+                <p class="table-description">{{ metadata.tables[table.name].description }}</p>
                 {% endif %}
 
                 {% if table.columns %}
@@ -140,55 +168,21 @@
                     <div class="column-list">
                         {% for column in table.columns[:5] %}
                         <div class="column-item">
-                            <span class="column-name">{{ column.name }}</span>
-                            <span class="column-type">{{ column.type }}</span>
-                            {% if column.is_pk %}
-                            <span class="column-flag">PK</span>
+                            <span class="column-name">{{ column }}</span>
+                            {% if metadata.tables[table.name].columns[column] %}
+                            <span class="column-description">{{ metadata.tables[table.name].columns[column].description }}</span>
                             {% endif %}
-                            {% if column.notnull %}
-                            <span class="column-flag">NOT NULL</span>
+                            {% if column in table.primary_keys %}
+                            <span class="column-flag">🔑 PK</span>
                             {% endif %}
                         </div>
                         {% endfor %}
                         {% if table.columns|length > 5 %}
                         <div class="column-item more-columns">
                             <em>...and {{ table.columns|length - 5 }} more column{% if (table.columns|length - 5) != 1
-                                %}s{%
-                                endif %}</em>
+                                %}s{% endif %}</em>
                         </div>
                         {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if table.sample_rows %}
-                <div class="table-preview">
-                    <h4>Sample Data:</h4>
-                    <div class="preview-table">
-                        <table>
-                            <thead>
-                            <tr>
-                                {% for column in table.columns[:3] %}
-                                <th>{{ column.name }}</th>
-                                {% endfor %}
-                                {% if table.columns|length > 3 %}
-                                <th>...</th>
-                                {% endif %}
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {% for row in table.sample_rows[:2] %}
-                            <tr>
-                                {% for cell in row[:3] %}
-                                <td>{{ cell|truncate(30) }}</td>
-                                {% endfor %}
-                                {% if table.columns|length > 3 %}
-                                <td>...</td>
-                                {% endif %}
-                            </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
                     </div>
                 </div>
                 {% endif %}
@@ -206,6 +200,7 @@
 
             {% endfor %}
         </div>
+    </div>
 </section>
 {% else %}
 <section class="no-tables">

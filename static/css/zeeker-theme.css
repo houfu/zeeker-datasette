@@ -1114,6 +1114,64 @@ main:not(.page-home main) {
     text-align: center;
 }
 
+.table-schema {
+    margin: 1rem 0;
+}
+
+.table-schema h4 {
+    margin-bottom: 0.75rem;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.column-list {
+    border: 1px solid #333;
+    border-radius: 6px;
+    background-color: #1a1a1a;
+}
+
+.column-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #2a2a2a;
+    gap: 1rem;
+}
+
+.column-item:last-child {
+    border-bottom: none;
+}
+
+.column-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+    color: #ffffff;
+    min-width: 120px;
+    flex-shrink: 0;
+}
+
+.column-type {
+    color: #9ca3af;
+    flex-grow: 1;
+    font-size: 0.9em;
+}
+
+.column-flag {
+    background-color: #3b82f6;
+    color: #ffffff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75em;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.more-columns {
+    font-style: italic;
+    color: #6b7280;
+    justify-content: center;
+}
+
 .database-actions-section {
     display: flex;
     flex-direction: column;
