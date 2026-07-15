@@ -395,6 +395,29 @@ def asgi_wrapper(datasette):
                 await app(scope, receive, send)
                 return
 
+            # Cursor leak (H1): when a sort is applied, stock Datasette embeds
+            # the VERBATIM value of the sort column's page-boundary row into the
+            # `next` cursor and `next_url` (tilde-encoded, trivially reversible)
+            # and runs a secondary `select <col> ... where pk=...` for it — even
+            # when that column is excluded from the row body. Sorting by a
+            # protected column therefore leaks its full text through the cursor,
+            # defeating the row/column stripping entirely; following `next`
+            # walks the whole table in content order. Refuse it. Non-protected
+            # (and default pk) sorts only ever encode non-protected values + the
+            # primary key into the cursor, so legitimate pagination is safe and
+            # is deliberately left intact rather than stripped.
+            sort_col = query.get("_sort", [None])[0]
+            sort_desc_col = query.get("_sort_desc", [None])[0]
+            if (sort_col and sort_col in protected) or (
+                sort_desc_col and sort_desc_col in protected
+            ):
+                await _send_403(
+                    send,
+                    "403 Forbidden: sorting by a protected full-text column "
+                    "is not available on this catalogue.",
+                )
+                return
+
             if fmt == "csv":
                 await _send_403(
                     send,

@@ -24,17 +24,16 @@ services:
       - AWS_REGION=${AWS_REGION:-default}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      # Owner full-access token: requests with "Authorization: Bearer <token>"
+      # Owner full-access token: requests with "Authorization: Bearer ***"
       # bypass the strip-columns catalogue lockdown (full JSON/CSV/SQL).
       # Unset/empty → no bypass exists.
       - ZEEKER_FULL_ACCESS_TOKEN=${ZEEKER_FULL_ACCESS_TOKEN:-}
-#    volumes:
-#      - ./templates:/app/templates
-#      - ./static:/app/static
-#      - ./plugins:/app/plugins
-#      - ./metadata.json:/app/metadata.json
-#      # Mount local data directory for refresh functionality
-#      - ./data:/data
+    # Bind-mount ./data → /data so the refresh script (manage.py) can
+    # replace .db files on the host and the container picks them up on
+    # restart WITHOUT re-downloading 936 MB from S3.  The entrypoint
+    # skips the S3 download when /data already contains .db files.
+    volumes:
+      - ./data:/data
     restart: unless-stopped
     healthcheck:
       # CON-healthcheck: GET /-/versions.json returns 200. Switched from `/`

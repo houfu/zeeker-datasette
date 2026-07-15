@@ -220,6 +220,72 @@ async def test_content_length_matches_stripped_body(ds):
     assert int(response.headers["content-length"]) == len(response.content)
 
 
+# ----------------------------------------------------- pagination cursor (H1)
+
+
+@pytest.mark.asyncio
+async def test_sort_by_protected_column_403(ds):
+    """H1: sorting by a protected column leaks its verbatim value through the
+    `next` cursor / `next_url` even though it is stripped from the rows. The
+    plugin must refuse the sort rather than emit the cursor."""
+    response = await ds.client.get(
+        "/testdb/articles.json?_sort=content_text&_size=1&_shape=objects"
+    )
+    assert response.status_code == 403
+    assert "SECRET" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_sort_desc_by_protected_column_403(ds):
+    response = await ds.client.get(
+        "/testdb/articles.json?_sort_desc=content_text&_size=1"
+    )
+    assert response.status_code == 403
+    assert "SECRET" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_sort_by_explicit_protected_column_403(ds):
+    """Protection via the per-table list (headlines.text), not deny_names."""
+    response = await ds.client.get(
+        "/testdb/headlines.json?_sort=text&_size=1"
+    )
+    assert response.status_code == 403
+    assert "SECRET" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_no_secret_in_cursor_when_paging_protected_table(ds):
+    """The whole point: a paginated response over a protected table must never
+    carry protected text anywhere — rows, columns, OR the cursor/next_url."""
+    response = await ds.client.get("/testdb/articles.json?_size=1")
+    assert response.status_code == 200
+    assert "SECRET" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_sort_by_safe_column_still_paginates(ds):
+    """Non-protected sorts are legitimate and must keep working, cursor and
+    all — only the protected sort key is refused."""
+    response = await ds.client.get(
+        "/testdb/articles.json?_sort=title&_size=1&_shape=objects"
+    )
+    assert response.status_code == 200
+    assert "SECRET" not in response.text
+    data = response.json()
+    assert data["rows"][0]["title"] == "Article one"
+    # pagination is preserved for safe sorts
+    assert data.get("next") is not None
+
+
+@pytest.mark.asyncio
+async def test_sort_by_protected_column_on_clean_table_passes(ds):
+    """A column named like a protected one on a table with no protected
+    columns is not protected here — must not be falsely blocked."""
+    response = await ds.client.get("/testdb/clean.json?_sort=name")
+    assert response.status_code == 200
+
+
 # ------------------------------------------------------------------------ CSV
 
 

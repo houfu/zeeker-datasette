@@ -1,20 +1,26 @@
 #!/bin/bash
 set -e
 
-# Run the S3 download script if S3_BUCKET is provided
-if [ -n "$S3_BUCKET" ]; then
+# S3 download: only on first boot (or after data directory wipe).
+# When /data already contains .db files (e.g. after a `docker compose
+# restart` triggered by manage.py refresh), skip the 30-second S3
+# download — the files are already in place via the ./data:/data
+# volume mount.
+if [ -n "$(ls -A /data/*.db 2>/dev/null)" ]; then
+    echo "Databases already present in /data — skipping S3 download"
+elif [ -n "$S3_BUCKET" ]; then
     echo "Downloading databases from S3 bucket: $S3_BUCKET"
     uv run /app/scripts/download_from_s3.py
 else
     echo "No S3_BUCKET specified, skipping database download"
 fi
 
-# Check if any databases were downloaded
-if [ -z "$(ls -A /data)" ]; then
+# Check if any databases exist
+if [ -z "$(ls -A /data/*.db 2>/dev/null)" ]; then
     echo "Warning: No databases found in /data directory"
 fi
 
-# List downloaded databases
+# List databases
 echo "Available databases:"
 ls -la /data
 

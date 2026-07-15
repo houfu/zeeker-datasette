@@ -26,11 +26,11 @@ RUN if [ -f "uv.lock" ]; then \
 # Copy all scripts (including enhanced asset management)
 COPY scripts/ ./scripts/
 
-# Copy surviving plugins (Phase-7 prune narrowed to cache_headers + __init__).
-# templates/ and static/ are no longer copied — the frontend service owns
-# HTML rendering. The plugins/ COPY is whitelisted so an accidental
-# restoration of plugins/<deleted-file>.py at the top level (e.g. via
-# rebase) does not silently re-introduce UI plugins into the image.
+# Copy top-level plugins/* explicitly (no glob) so an accidental
+# restoration of a deleted file (e.g. via rebase) does not silently
+# re-introduce UI plugins into the image. Phase-7 prune deleted the
+# template-rendering and static-asset plugins; the frontend service
+# now owns those surfaces.
 COPY plugins/__init__.py ./plugins/__init__.py
 COPY plugins/cache_headers.py ./plugins/cache_headers.py
 COPY plugins/strip_columns.py ./plugins/strip_columns.py
