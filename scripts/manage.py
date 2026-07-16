@@ -42,6 +42,11 @@ try:
 except ImportError:
     from download_from_s3 import ZeekerS3Downloader
 
+try:
+    from scripts import backup as backup_module
+except ImportError:
+    import backup as backup_module
+
 
 def setup_logging(verbose=False):
     """Setup logging configuration"""
@@ -700,6 +705,197 @@ def cleanup(clean_backups, keep_days, verbose):
 
     except Exception as e:
         logger.error(f"Error during cleanup: {e}", exc_info=True)
+
+
+def _backup_manager(logger):
+    """Build an S3BackupManager from the environment, or None + message."""
+    env_file = Path(__file__).parent.parent / ".env"
+    if env_file.exists():
+        load_dotenv(env_file)
+
+    s3_bucket = os.environ.get("S3_BUCKET")
+    if not s3_bucket:
+        click.echo("❌ S3_BUCKET environment variable not set")
+        return None
+    return backup_module.S3BackupManager(get_s3_client(), s3_bucket)
+
+
+def _parse_cli_date(date_str):
+    parsed = backup_module.parse_snapshot_date(date_str)
+    if parsed is None:
+        click.echo(f"❌ Invalid date '{date_str}' — use YYYY-MM-DD")
+    return parsed
+
+
+@cli.group()
+def backup():
+    """Rotating S3 backups of databases + configuration (issue #3).
+
+    Snapshots latest/*.db and assets/** into backups/YYYY-MM-DD/ via
+    server-side copy. `rotate` applies daily/weekly/monthly retention to
+    backups/ — and to archives/ (the prefix `zeeker backup` accumulates
+    into) via --prefix archives.
+    """
+    pass
+
+
+@backup.command()
+@click.option("--date", "date_str", default=None, help="Snapshot date YYYY-MM-DD (default: today)")
+@click.option("--dry-run", is_flag=True, help="List what would be copied without copying")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def snapshot(date_str, dry_run, verbose):
+    """Snapshot latest/*.db + assets/** into backups/YYYY-MM-DD/."""
+    logger = setup_logging(verbose)
+    manager = _backup_manager(logger)
+    if manager is None:
+        return
+
+    snapshot_date = None
+    if date_str:
+        snapshot_date = _parse_cli_date(date_str)
+        if snapshot_date is None:
+            return
+
+    try:
+        manifest = manager.create_snapshot(snapshot_date, dry_run=dry_run)
+    except Exception as e:
+        logger.error(f"Snapshot failed: {e}", exc_info=True)
+        click.echo(f"❌ Snapshot failed: {e}")
+        raise click.Abort()
+
+    size_mb = manifest["total_bytes"] / (1024 * 1024)
+    verb = "Would snapshot" if dry_run else "Snapshotted"
+    click.echo(
+        f"✅ {verb} {manifest['file_count']} files ({size_mb:.1f}MB) "
+        f"to backups/{manifest['snapshot']}/"
+    )
+
+
+@backup.command(name="list")
+@click.option(
+    "--prefix",
+    default=backup_module.BACKUPS_PREFIX,
+    show_default=True,
+    help="Dated S3 prefix to list (e.g. archives)",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def list_backups(prefix, verbose):
+    """List dated snapshots under a prefix (backups/ or archives/)."""
+    logger = setup_logging(verbose)
+    manager = _backup_manager(logger)
+    if manager is None:
+        return
+
+    dates = manager.list_snapshot_dates(prefix)
+    if not dates:
+        click.echo(f"No dated snapshots found under {prefix}/")
+        return
+
+    click.echo(f"📦 {len(dates)} snapshot(s) under {prefix}/:")
+    for d in dates:
+        manifest = (
+            manager.read_manifest(d) if prefix == backup_module.BACKUPS_PREFIX else None
+        )
+        if manifest:
+            size_mb = manifest["total_bytes"] / (1024 * 1024)
+            click.echo(f"   📁 {d.isoformat()}  ({manifest['file_count']} files, {size_mb:.1f}MB)")
+        else:
+            click.echo(f"   📁 {d.isoformat()}")
+
+
+@backup.command()
+@click.option(
+    "--prefix",
+    default=backup_module.BACKUPS_PREFIX,
+    show_default=True,
+    help="Dated S3 prefix to rotate (use 'archives' to prune zeeker backup output)",
+)
+@click.option("--keep-daily", default=7, show_default=True, help="Most recent snapshots to keep")
+@click.option("--keep-weekly", default=4, show_default=True, help="Weekly snapshots to keep")
+@click.option("--keep-monthly", default=6, show_default=True, help="Monthly snapshots to keep")
+@click.option("--dry-run", is_flag=True, help="Show the rotation plan without deleting")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt (for cron)")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def rotate(prefix, keep_daily, keep_weekly, keep_monthly, dry_run, yes, verbose):
+    """Apply daily/weekly/monthly retention to a dated prefix."""
+    logger = setup_logging(verbose)
+    manager = _backup_manager(logger)
+    if manager is None:
+        return
+
+    keep, delete = manager.plan_rotation(prefix, keep_daily, keep_weekly, keep_monthly)
+    click.echo(
+        f"Retention for {prefix}/: keep {len(keep)}, delete {len(delete)} "
+        f"(daily={keep_daily}, weekly={keep_weekly}, monthly={keep_monthly})"
+    )
+    if not delete:
+        click.echo("✅ Nothing to delete")
+        return
+
+    for d in delete:
+        click.echo(f"   🗑️  {prefix}/{d.isoformat()}/")
+
+    if dry_run:
+        click.echo("Dry run — nothing deleted")
+        return
+
+    if not yes and not click.confirm(f"Delete these {len(delete)} snapshot(s)?"):
+        click.echo("Aborted — nothing deleted")
+        return
+
+    total = 0
+    for d in delete:
+        total += manager.delete_snapshot(prefix, d)
+    click.echo(f"✅ Deleted {len(delete)} snapshot(s), {total} object(s)")
+
+
+@backup.command()
+@click.option("--snapshot", "date_str", required=True, help="Snapshot date YYYY-MM-DD to restore")
+@click.option(
+    "--to-dir",
+    default=None,
+    type=click.Path(file_okay=False),
+    help="Download to a local directory instead of restoring over latest/ + assets/",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be restored")
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt")
+@click.option("--verbose", "-v", is_flag=True, help="Verbose logging")
+def restore(date_str, to_dir, dry_run, yes, verbose):
+    """Restore a snapshot — over the live prefixes, or to a local dir."""
+    logger = setup_logging(verbose)
+    manager = _backup_manager(logger)
+    if manager is None:
+        return
+
+    snapshot_date = _parse_cli_date(date_str)
+    if snapshot_date is None:
+        return
+
+    if not manager.snapshot_keys(snapshot_date):
+        click.echo(f"❌ No snapshot found at backups/{snapshot_date.isoformat()}/")
+        return
+
+    try:
+        if to_dir:
+            files = manager.download_snapshot(snapshot_date, to_dir, dry_run=dry_run)
+            verb = "Would download" if dry_run else "Downloaded"
+            click.echo(f"✅ {verb} {len(files)} file(s) to {to_dir}")
+            if not dry_run:
+                click.echo(f"💡 Run a copy with: datasette serve {to_dir}/data/*.db")
+        else:
+            if not dry_run and not yes:
+                if not click.confirm(
+                    f"Overwrite live latest/ + assets/ with backups/{snapshot_date.isoformat()}/?"
+                ):
+                    click.echo("Aborted — nothing restored")
+                    return
+            keys = manager.restore_snapshot(snapshot_date, dry_run=dry_run)
+            verb = "Would restore" if dry_run else "Restored"
+            click.echo(f"✅ {verb} {len(keys)} object(s) from backups/{snapshot_date.isoformat()}/")
+    except Exception as e:
+        logger.error(f"Restore failed: {e}", exc_info=True)
+        click.echo(f"❌ Restore failed: {e}")
+        raise click.Abort()
 
 
 if __name__ == "__main__":

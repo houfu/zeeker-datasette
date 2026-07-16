@@ -30,6 +30,7 @@ Zeeker Datasette is a data exploration platform built on Datasette. It provides 
   - `_header.html`, `_footer.html` - Shared header/footer partials
   - `pages/` - Static pages (about, how-to-use, sources, status, developers)
 - `scripts/` - Utility scripts including S3 downloads and management
+  - `backup.py` - Rotating S3 backup system (snapshot/rotate/restore, GFS retention); CLI via `manage.py backup`, daily cron in `zeeker-backup-cron.sh`
 - `tests/` - Test suite with pytest configuration
 - `entrypoint.sh` - Docker entrypoint (includes --cors flag)
 

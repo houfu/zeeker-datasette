@@ -62,6 +62,31 @@ docker compose run --rm zeeker-datasette \
 
 `--help` shows extra flags like `--force` or `--no-restart`. A ready‑to‑use cron wrapper lives in **`zeeker-refresh-cron.sh`**.
 
+### Backups
+
+A rotating backup system snapshots the system of record — `latest/*.db`
+(databases) and `assets/**` (configuration) — into dated prefixes under
+`backups/YYYY-MM-DD/` in the same bucket, using server‑side S3 copy (nothing
+is downloaded through the host). Each snapshot carries a `manifest.json`
+describing exactly what it contains.
+
+```bash
+uv run scripts/manage.py backup snapshot          # snapshot today
+uv run scripts/manage.py backup list              # list snapshots
+uv run scripts/manage.py backup rotate --dry-run  # preview retention
+uv run scripts/manage.py backup rotate --yes      # keep 7 daily / 4 weekly / 6 monthly
+
+# Prune the archives/ prefix that `zeeker backup` (data projects) accumulates into:
+uv run scripts/manage.py backup rotate --prefix archives --yes
+
+# Restore — over the live prefixes, or to a local dir to run a copy of the system:
+uv run scripts/manage.py backup restore --snapshot 2026-07-16
+uv run scripts/manage.py backup restore --snapshot 2026-07-16 --to-dir ./restored
+```
+
+A daily cron wrapper (snapshot + rotate `backups/` and `archives/`) lives in
+**`zeeker-backup-cron.sh`**.
+
 ## Project layout
 
 ```
