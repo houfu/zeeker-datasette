@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3 (uv 0.11.14)
+        with:
+          version: '0.11.14'
+          # Match the production images (python:3.12-slim) instead of letting
+          # uv pick the newest interpreter allowed by requires-python.
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras
+
+      - name: Run tests
+        run: uv run pytest
+
+  publish:
+    name: Build and publish Docker images
+    # Images build and publish after tests pass, on push to master only.
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Build and push zeeker-datasette image
+        id: push-datasette
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          # Immutable per-commit tag; images are built once per commit and never moved.
+          tags: ghcr.io/zeeker-sg/zeeker-datasette:sha-${{ github.sha }}
+
+      - name: Build and push zeeker-frontend image
+        id: push-frontend
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ./packages/zeeker-frontend
+          file: ./packages/zeeker-frontend/Dockerfile
+          push: true
+          tags: ghcr.io/zeeker-sg/zeeker-frontend:sha-${{ github.sha }}
