@@ -10,9 +10,9 @@
 
 services:
   zeeker-datasette:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Governance: run the CI-published image pinned to an immutable sha tag,
+    # NOT a local ad-hoc build. Update the tag by merging the next sha via PR.
+    image: ghcr.io/zeeker-sg/zeeker-datasette:sha-13c00cb3e26cfdf672da3a85707c3dfac4f52a29
     container_name: zeeker-datasette
     # NOTE: no `ports:` — internal-only (REQ-internal-only-datasette-exposure).
     # Reachable from caddy as `zeeker-datasette:8001` via the default
@@ -48,9 +48,8 @@ services:
       start_period: 60s
 
   frontend:
-    build:
-      context: ./packages/zeeker-frontend
-      dockerfile: Dockerfile
+    # Governance: CI-published image, immutable sha tag (same commit as datasette).
+    image: ghcr.io/zeeker-sg/zeeker-frontend:sha-13c00cb3e26cfdf672da3a85707c3dfac4f52a29
     container_name: zeeker-frontend
     # No ports published — reachable only at `frontend:8000` internally.
     # No `./data` volume mount — REQ-frontend-data-via-http makes this
