@@ -265,6 +265,78 @@ class TestCliCommands:
 
     @patch("scripts.manage.setup_logging")
     @patch("scripts.manage.load_dotenv")
+    @patch("scripts.manage.datetime")
+    @patch("scripts.manage.calculate_directory_hash")
+    @patch("scripts.manage.download_from_s3_to_dir")
+    @patch("scripts.manage.subprocess.run")
+    @patch("scripts.manage.shutil")
+    def test_refresh_command_backup_collision(
+            self,
+            mock_shutil,
+            mock_subprocess,
+            mock_download,
+            mock_calculate_hash,
+            mock_datetime,
+            mock_load_dotenv,
+            mock_setup_logging,
+    ):
+        """Regression: existing backup dir must not crash refresh with FileExistsError.
+
+        2026-09-04 08:03: two concurrent refresh runs collided on
+        data.backup.20260904_080319 and shutil.copytree aborted the refresh.
+        """
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        mock_calculate_hash.side_effect = ["hash123", "hash456"]  # Different hashes
+        mock_download.return_value = True
+
+        # Freeze the timestamp so we can pre-create a colliding backup dir
+        frozen_stamp = "20260904_080319"
+        mock_datetime.now.return_value.strftime.return_value = frozen_stamp
+
+        # Mock successful subprocess run
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_subprocess.return_value = mock_result
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Simulate the backup dir a previous/concurrent run already created
+            (temp_path / f"data.backup.{frozen_stamp}").mkdir()
+            # Data dir with a db file so the backup path is taken
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
+            (data_dir / "test.db").write_bytes(b"test database content")
+
+            with patch("scripts.manage.Path") as mock_path_class:
+                # Create a mock Path instance that represents the script file
+                mock_script_path = Mock()
+                mock_script_path.parent.parent = Path(temp_dir)
+
+                # Make Path(__file__) return our mock script path
+                def path_side_effect(arg):
+                    if str(arg).endswith('manage.py') or arg == '__file__':
+                        return mock_script_path
+                    else:
+                        return Path(arg)
+
+                mock_path_class.side_effect = path_side_effect
+
+                result = self.runner.invoke(
+                    manage.refresh, ["--staging-dir", str(temp_path / "staging")]
+                )
+
+                assert result.exit_code == 0
+                # Backup must go to a suffixed dir, not crash
+                assert mock_shutil.copytree.called
+                backup_target = mock_shutil.copytree.call_args[0][1]
+                assert backup_target.name == f"data.backup.{frozen_stamp}_1"
+                # The pre-existing backup dir is left untouched
+                assert (temp_path / f"data.backup.{frozen_stamp}").exists()
+
+    @patch("scripts.manage.setup_logging")
+    @patch("scripts.manage.load_dotenv")
     def test_refresh_command_download_failure(self, mock_load_dotenv, mock_setup_logging):
         """Test refresh command when S3 download fails"""
         mock_logger = Mock()
