@@ -55,6 +55,16 @@ data.zeeker.sg {
     @bad_bot header_regexp User-Agent "meta-externalagent|meta-webindexer|facebookexternalhit|FacebookBot|Barkrowler"
     respond @bad_bot "Forbidden" 403
 
+    # Gone — /sglawwatch/temp_headlines was dropped in April 2026
+    # (zeeker-builds/sglawwatch-zeeker commit 9140366). Distributed crawler
+    # sweeps of the stale URL space (~300 requests/day, 1000+ unique IPs,
+    # Aug-Sep 2026) each became a frontend 503 "Data API unavailable"
+    # because datasette answers missing tables with 400 "no such table".
+    # 410 Gone tells crawlers to deindex permanently. The frontend also
+    # maps these to 404 now; this is the zero-cost edge backstop.
+    @temp_headlines path /sglawwatch/temp_headlines*
+    respond @temp_headlines 410
+
     # Block ?sql= queries and FTS shadow tables at the edge before any
     # proxy hop. See Phase-D note in the file header.
     #
