@@ -21,6 +21,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -120,6 +121,32 @@ def frontend_test() -> dict[str, str]:
     and by verify_phase_0{2,3}.sh as a frontend-reachability probe.
     """
     return {"status": "ok", "service": "zeeker-frontend"}
+
+
+# Favicon responses — registered before the database_router catch-all so
+# /favicon.ico never matches /{db}. Without this, a bare FastAPI app has no
+# favicon route: browsers/crawlers probing /favicon.ico fall through to the
+# /{db} handler, which fetches /favicon.ico.json upstream and crashes on
+# PNG bytes (UnicodeDecodeError → 500). ~78% of the Aug-2026 500 burst was
+# exactly this (see ops skill: datasette-500-favicon-csv-errors).
+def _favicon_response(name: str) -> FileResponse:
+    path = _STATIC_DIR / name
+    response = FileResponse(path, media_type="image/png")
+    # Immutable asset (path encodes content); cache hard at the CDN edge.
+    response.headers["Cache-Control"] = "public, max-age=604800, immutable"
+    return response
+
+
+@app.get("/favicon.ico")
+async def favicon_ico() -> FileResponse:
+    # Browsers request /favicon.ico regardless of <link> tags; serve the
+    # 32x32 PNG rather than 500ing.
+    return _favicon_response("favicon-32x32.png")
+
+
+@app.get("/apple-touch-icon.png")
+def apple_touch_icon() -> FileResponse:
+    return _favicon_response("apple-touch-icon.png")
 
 
 app.include_router(home_router)

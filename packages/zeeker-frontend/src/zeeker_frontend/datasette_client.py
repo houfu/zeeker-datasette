@@ -5,6 +5,7 @@ Design per RESEARCH §"Pattern 2: Thin Handler + Graceful Error" and
 """
 from __future__ import annotations
 
+import json
 import re
 import time
 from typing import Any
@@ -252,6 +253,32 @@ def safe_aside_columns(
     return out
 
 
+def _is_datasette_missing(status: int, body: bytes | None) -> bool:
+    """True when datasette says the addressed resource does not exist.
+
+    Datasette answers some missing-table/row lookups with 400 + JSON body
+    {"ok": false, "error": "no such table: X", ...} instead of 404 (observed
+    live 2026-09-02 on data.zeeker.sg). Frontend routes previously mapped
+    every raise_for_status() failure to 503 "Data API unavailable", so a
+    stale crawler URL for a dropped table rendered as a server outage.
+    Distinguish "upstream says missing" (→ client 404) from genuine
+    transport/5xx trouble (→ 503).
+    """
+    if status == 404:
+        return True
+    if status != 400:
+        return False
+    # 400s that ARE "not found": datasette's SQLite layer surfaces missing
+    # tables as "Invalid SQL"/no-such-table errors. Parse defensively — the
+    # body shape is not part of any API contract.
+    try:
+        payload = json.loads(body or b"")
+    except ValueError:
+        return False
+    error = str(payload.get("error") or "")
+    return "no such table" in error
+
+
 async def fetch_databases(client: httpx.AsyncClient) -> list[dict]:
     """GET /.json → list of database dicts with `name` key promoted.
 
@@ -314,7 +341,8 @@ async def fetch_table(
     table: str,
     params: dict | None = None,
 ) -> dict | None:
-    """GET /{db}/{table}.json with allowlisted params; None on 404, raises on other errors.
+    """GET /{db}/{table}.json with allowlisted params; None on 404 / datasette
+    400 "no such table", raises on other errors.
 
     Always passes _shape=objects so upstream rows are dicts keyed by column
     name (RESEARCH Pitfall 1). Drops unknown query keys to close the SSRF-ish
@@ -330,7 +358,7 @@ async def fetch_table(
             safe_params[k] = v
         # else: silently drop (e.g. _extras, _internal, allow_execute_sql)
     r = await client.get(f"/{db}/{table}.json", params=safe_params)
-    if r.status_code == 404:
+    if _is_datasette_missing(r.status_code, r.content):
         return None
     r.raise_for_status()
     return r.json()
@@ -342,9 +370,14 @@ async def fetch_row(
     table: str,
     pk: str,
 ) -> dict | None:
-    """GET /{db}/{table}/{pk}.json — single row; None on 404."""
+    """GET /{db}/{table}/{pk}.json — single row; None on 404.
+
+    Also None on datasette's 400 "no such table" shape (dropped tables are
+    answered with Invalid SQL, not 404 — see _is_datasette_missing). A 400
+    for a real query problem (e.g. sql_time_limit_ms) still raises.
+    """
     r = await client.get(f"/{db}/{table}/{pk}.json", params={"_shape": "objects"})
-    if r.status_code == 404:
+    if _is_datasette_missing(r.status_code, r.content):
         return None
     r.raise_for_status()
     return r.json()
