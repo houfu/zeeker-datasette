@@ -189,6 +189,12 @@ def refresh(force, no_restart, verbose, staging_dir):
 
         # Backup current data
         backup_dir = project_dir / f"data.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # Collision guard: if a backup from this second already exists (e.g. a
+        # failed run left one behind, or two runs race), suffix instead of crash.
+        _n = 1
+        while backup_dir.exists():
+            backup_dir = project_dir / f"data.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}_{_n}"
+            _n += 1
         if data_dir.exists() and any(data_dir.glob("*.db")):
             shutil.copytree(data_dir, backup_dir)
             logger.info(f"Backed up current data to {backup_dir}")
